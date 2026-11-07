@@ -1,0 +1,29 @@
+#!/sbin/openrc-run
+# DHCP for USB tethering (replaces unudhcpd.usb0, which sends no gateway/DNS).
+supervisor=supervise-daemon
+description="USB tethering DHCP server on usb0"
+command="/usr/sbin/udhcpd"
+command_args="-f /etc/udhcpd-usb0.conf"
+
+depend() {
+	after localmount
+	before net docker
+}
+
+# Docker sets the legacy-iptables FORWARD policy to DROP; DOCKER-USER is the chain it leaves to us
+# (it reuses the chain if it already exists, so creating it before docker starts is fine).
+fwd() {
+	iptables -N DOCKER-USER 2>/dev/null
+	for r in "-i usb0 -o wlan0 -j ACCEPT" "-i wlan0 -o usb0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"; do
+		iptables -$1 DOCKER-USER $r 2>/dev/null
+	done
+}
+
+start_pre() {
+	touch /run/udhcpd.usb0.leases
+	fwd D; fwd I
+}
+
+stop_post() {
+	fwd D
+}

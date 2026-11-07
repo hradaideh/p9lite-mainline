@@ -1,0 +1,9 @@
+# USB tethering: a computer plugged into the phone (usb0, 172.16.42.0/24 from p9-usb-tether)
+# gets internet through the phone's Wi-Fi. Forwarding from usb* is already accepted by
+# postmarketOS 51_usb_inet.nft; this only adds the NAT.
+table ip p9tether_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.16.42.0/24 oifname "wlan0" masquerade comment "USB tether clients behind 192.168.2.50"
+	}
+}

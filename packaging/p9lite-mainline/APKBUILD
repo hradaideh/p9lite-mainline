@@ -2,15 +2,17 @@
 # Device-side configuration for running linux-huawei-venus-mainline under postmarketOS.
 pkgname=p9lite-mainline
 pkgver=1
-pkgrel=3
-pkgdesc="P9 lite mainline config: cmdline, boot_ok, Hi1102 init, firewall, status display"
+pkgrel=4
+pkgdesc="P9 lite mainline config: boot, Wi-Fi, firewall, display, USB tether, microSD"
 arch="noarch"
 url="https://github.com/hradaideh/p9lite-mainline"
 license="MIT"
 depends="linux-huawei-venus-mainline"
-options="!check"
+options="!check !fhs"
+install="$pkgname.post-install $pkgname.post-upgrade"
 # ships /etc/init.d/hisi-wifi and p9-display on purpose (one small device package, no -openrc split)
 source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft
+	72_usb_tether.nft udhcpd-usb0.conf p9-usb-tether.initd p9-sd.initd 74_forgejo.nft
 	display/p9-display display/p9-display.initd display/p9-display.confd display/index.html"
 
 package() {
@@ -19,6 +21,11 @@ package() {
 	install -Dm755 "$srcdir"/hisi-wifi "$pkgdir"/etc/init.d/hisi-wifi
 	install -Dm644 "$srcdir"/60_homeassistant.nft "$pkgdir"/etc/nftables.d/60_homeassistant.nft
 	install -Dm644 "$srcdir"/70_mesh.nft "$pkgdir"/etc/nftables.d/70_mesh.nft
+	install -Dm644 "$srcdir"/72_usb_tether.nft "$pkgdir"/etc/nftables.d/72_usb_tether.nft
+	install -Dm644 "$srcdir"/udhcpd-usb0.conf "$pkgdir"/etc/udhcpd-usb0.conf
+	install -Dm755 "$srcdir"/p9-usb-tether.initd "$pkgdir"/etc/init.d/p9-usb-tether
+	install -Dm755 "$srcdir"/p9-sd.initd "$pkgdir"/etc/init.d/p9-sd
+	install -Dm644 "$srcdir"/74_forgejo.nft "$pkgdir"/etc/nftables.d/74_forgejo.nft
 	install -Dm755 "$srcdir"/p9-display "$pkgdir"/usr/local/bin/p9-display
 	install -Dm755 "$srcdir"/p9-display.initd "$pkgdir"/etc/init.d/p9-display
 	install -Dm644 "$srcdir"/p9-display.confd "$pkgdir"/etc/conf.d/p9-display
@@ -30,6 +37,11 @@ sha512sums="
 5f7ff8409ef6476f196c226eadc51d0ae1dc57b95c0cba2d0256bc2e95e7d8f7fbce151f6e46e72fb83763dc3e3a1f5a3b6fc9acc5d3a0c5ee871d03057e0657  hisi-wifi
 3249e2526004ee4446402d219687f290bbc82b5077fbbbcc205141d79669f0b5739f71ff8a507b6e9677267ed5233f916150dcc8e1909971361eacc0d93288db  60_homeassistant.nft
 334c9bcf8ca5403ef6ea9f853d74c44c0f52113805c6e358bcd6db125d16b39c1aef7fd4ad0663d6584286872ecd9cd8432f7173af250fd5e2e9c763d7ccdf6f  70_mesh.nft
+3fe9adbf25e38a0e3e56b0afef29294c217442ce7c8476801a0a0fba35c9fed90410c273b5c5c5b04b25332e09b8549c8afbfe71ccaf390484b3c256451b7cdc  72_usb_tether.nft
+a718b6621ab093a667c822956237af99cb66daa0e8f80e78a89163725728d96a6a6bbb30d2a8fc5a00f43cbd5220e45dd0972c960fd7c945c8dd07b25fc2c556  udhcpd-usb0.conf
+f0a8f8c0a38c8d2df8aeb04f0a3c856cda39902218e88df6446100c80109e2853b084148e00ec939bd031f3dd4477dd31d0da46241c7da9e6d50ed12b343657e  p9-usb-tether.initd
+93098fcadb7b8ad8ac3d74978a944ef489726637aed53ee2e99c58e6156a353262181c47da5fcf07983c16bd4bbc6c4a7df2050300f66076fa1f7b7c1e1fa286  p9-sd.initd
+c0180c7b6dfb279f0e03270adb992a447c04bd0f0ac9d460a244dc01424fca7eda9b142b33be9bcc81558189b8afaadbbd1f38e3bb49896e104e171f844b8874  74_forgejo.nft
 aeaffe5876c6800cceaff2fafe424736038fc86c9fd3f59ed167f34fdc8be6fe9d5adf2aa01c56ccdc0ab34aa2910250b27c5efada66ee8ce38d35529cc0c19f  p9-display
 0e3227ce06b9cdf7153b7efeba2dd1417270eb301c0d0efda9c4466813f9dea77d414c2d7df797ee0f46b75972b806b637987c90456649c854b228daa8c9cd1f  p9-display.initd
 afca61dc0383513227ae2fb632eecc416e0fdd7dda25a71f4dfd7fa87cb7a6d211e85ac723163a2ec72201c20dc1ec6802ee71416da8a169fa83df8c871d926b  p9-display.confd

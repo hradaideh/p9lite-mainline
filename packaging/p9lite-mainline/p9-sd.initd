@@ -1,0 +1,33 @@
+#!/sbin/openrc-run
+# microSD: start the slot (p9test, dwmmc1), fsck and mount the data partition. docker and forgejo
+# rc_need this service, so they never start on the empty mount point.
+description="P9 lite microSD data mount"
+: ${P9_SD_UUID:=baa09ffe-024c-44ac-adaa-87467e1760c6}
+: ${P9_SD_MNT:=/mnt/sd}
+
+depend() {
+	need sysfs
+	after localmount
+	before docker forgejo
+}
+
+start() {
+	ebegin "Mounting microSD at $P9_SD_MNT"
+	mountpoint -q "$P9_SD_MNT" && { eend 0; return 0; }
+	[ -e /sys/bus/platform/devices/ff37f000.dwmmc1/driver ] || echo 1 > /sys/kernel/debug/p9test/sd
+	dev=; i=0
+	while [ -z "$dev" ] && [ $i -lt 30 ]; do
+		dev=$(findfs UUID="$P9_SD_UUID" 2>/dev/null) || { sleep 1; i=$((i + 1)); }
+	done
+	[ -n "$dev" ] || { eend 1 "no partition with UUID $P9_SD_UUID"; return 1; }
+	fsck.ext4 -p "$dev" >/dev/null; [ $? -le 1 ] || { eend 1 "fsck failed on $dev"; return 1; }
+	mkdir -p "$P9_SD_MNT"
+	mount -t ext4 -o noatime "$dev" "$P9_SD_MNT"
+	eend $?
+}
+
+stop() {
+	ebegin "Unmounting microSD"
+	umount "$P9_SD_MNT"
+	eend $?
+}

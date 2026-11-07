@@ -1,0 +1,5 @@
+table inet filter {
+	chain input {
+		tcp dport { 3000, 2222 } accept comment "Forgejo web + SSH"
+	}
+}

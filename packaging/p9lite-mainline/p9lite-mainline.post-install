@@ -1,0 +1,8 @@
+#!/bin/sh
+# USB tethering: swap pmOS unudhcpd.usb0 for p9-usb-tether (same port 67 on usb0)
+rc-update -q del unudhcpd.usb0 boot 2>/dev/null
+rc-update -q add p9-usb-tether boot
+# microSD data mount; docker must not start without it (its data-root lives there)
+rc-update -q add p9-sd boot
+grep -q '^rc_need=' /etc/conf.d/docker 2>/dev/null || echo 'rc_need="p9-sd"' >> /etc/conf.d/docker
+exit 0
