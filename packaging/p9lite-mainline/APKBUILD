@@ -2,7 +2,7 @@
 # Device-side configuration for running linux-huawei-venus-mainline under postmarketOS.
 pkgname=p9lite-mainline
 pkgver=1
-pkgrel=4
+pkgrel=5
 pkgdesc="P9 lite mainline config: boot, Wi-Fi, firewall, display, USB tether, microSD"
 arch="noarch"
 url="https://github.com/hradaideh/p9lite-mainline"
@@ -13,7 +13,7 @@ install="$pkgname.post-install $pkgname.post-upgrade"
 # ships /etc/init.d/hisi-wifi and p9-display on purpose (one small device package, no -openrc split)
 source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft
 	72_usb_tether.nft udhcpd-usb0.conf p9-usb-tether.initd p9-sd.initd 74_forgejo.nft
-	display/p9-display display/p9-display.initd display/p9-display.confd display/index.html"
+	display/p9-display display/p9-hkadc display/p9-display.initd display/p9-display.confd display/index.html"
 
 package() {
 	install -Dm644 "$srcdir"/deviceinfo "$pkgdir"/etc/deviceinfo
@@ -27,6 +27,7 @@ package() {
 	install -Dm755 "$srcdir"/p9-sd.initd "$pkgdir"/etc/init.d/p9-sd
 	install -Dm644 "$srcdir"/74_forgejo.nft "$pkgdir"/etc/nftables.d/74_forgejo.nft
 	install -Dm755 "$srcdir"/p9-display "$pkgdir"/usr/local/bin/p9-display
+	install -Dm755 "$srcdir"/p9-hkadc "$pkgdir"/usr/local/bin/p9-hkadc
 	install -Dm755 "$srcdir"/p9-display.initd "$pkgdir"/etc/init.d/p9-display
 	install -Dm644 "$srcdir"/p9-display.confd "$pkgdir"/etc/conf.d/p9-display
 	install -Dm644 "$srcdir"/index.html "$pkgdir"/srv/p9-web/index.html
@@ -42,8 +43,9 @@ a718b6621ab093a667c822956237af99cb66daa0e8f80e78a89163725728d96a6a6bbb30d2a8fc5a
 f0a8f8c0a38c8d2df8aeb04f0a3c856cda39902218e88df6446100c80109e2853b084148e00ec939bd031f3dd4477dd31d0da46241c7da9e6d50ed12b343657e  p9-usb-tether.initd
 93098fcadb7b8ad8ac3d74978a944ef489726637aed53ee2e99c58e6156a353262181c47da5fcf07983c16bd4bbc6c4a7df2050300f66076fa1f7b7c1e1fa286  p9-sd.initd
 c0180c7b6dfb279f0e03270adb992a447c04bd0f0ac9d460a244dc01424fca7eda9b142b33be9bcc81558189b8afaadbbd1f38e3bb49896e104e171f844b8874  74_forgejo.nft
-aeaffe5876c6800cceaff2fafe424736038fc86c9fd3f59ed167f34fdc8be6fe9d5adf2aa01c56ccdc0ab34aa2910250b27c5efada66ee8ce38d35529cc0c19f  p9-display
+89fafa9cfd0997365815e5d894181675ffc23e62f1cce1cd4a65415ed6da8725d7e923f9a48d7b9f678bdfc229cda94326f4f4dff1323584062beda29b10a098  p9-display
+ecadc71cf35d5ede52baf96f2d7a1957103e96599ec07bbe6b8c70d97cc5d785a7ac26a3d10181cbd6a6098df0b0f0f41878f152ffa1b3ab835868f13dfa0eff  p9-hkadc
 0e3227ce06b9cdf7153b7efeba2dd1417270eb301c0d0efda9c4466813f9dea77d414c2d7df797ee0f46b75972b806b637987c90456649c854b228daa8c9cd1f  p9-display.initd
 afca61dc0383513227ae2fb632eecc416e0fdd7dda25a71f4dfd7fa87cb7a6d211e85ac723163a2ec72201c20dc1ec6802ee71416da8a169fa83df8c871d926b  p9-display.confd
-4d55a10acaae1e5afb14eea82f2aaf1857253d4ea95fc9665cef45ad50070825942287f6fc6e4631f91b2fa11e513ecfd19ddaf5aa65cf93cfacc528a34ad207  index.html
+fa802855418346ff9a35ca43a65c38334ba6a2c353794afcd50b09dca57942183b39f242edb96e8fe2f6e00b80a6b49a15fdbb8fb6608bf5cc70689d931fb64a  index.html
 "

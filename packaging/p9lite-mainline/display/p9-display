@@ -19,6 +19,7 @@ BRIGHTNESS = int(os.environ.get('P9_BRIGHTNESS', '60'))
 INTERVAL = int(os.environ.get('P9_INTERVAL', '10'))
 WEB_DIR = os.environ.get('P9_WEB_DIR', '/srv/p9-web')   # served by the nginx container
 MESH_CT = os.environ.get('P9_MESH_CONTAINER', 'mesh')
+SD_MNT = os.environ.get('P9_SD_MNT', '/mnt/sd')            # microSD data mount (p9-sd)
 MESH_ROUTES = os.environ.get('P9_MESH_ROUTES', '192.168.1.0/24 192.168.2.0/24').split()
 DSS_BASE, DSS_FB = 0xE8600000, 0x0B000000   # DSS registers, bootloader logo/scanout buffer
 
@@ -195,12 +196,28 @@ def battery():
     if ma > 20: bst = 'CHARGING'
     elif mv >= 4300: bst = 'FULL'
     else: bst = 'DISCHARGING'
-    return pct, bst, mv >= 4300 or ma > 20, abs(ma), None, mv
+    try:   # battery NTC via LPM3 HKADC (p9-hkadc, /dev/mem mailbox); None if LPM3 does not answer
+        temp = float(subprocess.run(['/usr/local/bin/p9-hkadc'], capture_output=True, text=True, timeout=5).stdout)
+    except Exception:
+        temp = None
+    return pct, bst, mv >= 4300 or ma > 20, abs(ma), temp, mv
 
-def disk():
-    s = os.statvfs('/')
-    tot = s.f_blocks * s.f_frsize / 2**30; free = s.f_bavail * s.f_frsize / 2**30
-    return tot - free, tot
+def disk(path='/'):
+    """(used, usable) GB like df: ext4's reserved blocks count as neither used nor available."""
+    s = os.statvfs(path)
+    used = (s.f_blocks - s.f_bfree) * s.f_frsize / 2**30
+    return used, used + s.f_bavail * s.f_frsize / 2**30
+
+def sd_disk():
+    """(used, total) GB of the microSD data mount, or None when it is not mounted."""
+    if not os.path.ismount(SD_MNT): return None
+    try: return disk(SD_MNT)
+    except OSError: return None
+
+def tcp_ok(port, host='127.0.0.1'):
+    try:
+        with socket.create_connection((host, port), timeout=3): return True
+    except OSError: return False
 
 def uptime():
     u = int(float(rd('/proc/uptime', '0').split()[0]))
@@ -213,8 +230,7 @@ def render(cv, tick):
     y = 6
     cv.text(4 + dx, y, socket.gethostname()[:14], 6, 2); y += 20
     cv.text(4 + dx, y, time.strftime('%H:%M'), 1, 4); y += 32
-    cv.text(4 + dx, y, time.strftime('%a %d %b %Y'), 2); y += 12
-    cv.text(4 + dx, y, 'UP ' + uptime(), 2); y += 14
+    cv.text(4 + dx, y, time.strftime('%a %d %b') + '  UP ' + uptime(), 2); y += 14
 
     cv.rect(4, y, LW - 8, 1, 7); y += 6
     ssid, rssi, st = wifi()
@@ -228,6 +244,7 @@ def render(cv, tick):
     c = cpu_pct(); m = meminfo()
     used = m['MemTotal'] - m['MemAvailable']; sw = m['SwapTotal'] - m['SwapFree']
     du, dt = disk()
+    sd = sd_disk()
     tz = rd('/sys/class/thermal/thermal_zone0/temp', '')
     t = int(tz) / 1000 if tz.lstrip('-').isdigit() else None
     bpct, bst, ext, cur, btemp, bmv = battery()
@@ -246,6 +263,8 @@ def render(cv, tick):
             'ram_mb': {'used': used, 'total': m['MemTotal']},
             'swap_mb': {'used': sw, 'total': m['SwapTotal']},
             'disk_gb': {'used': round(du, 2), 'total': round(dt, 2)},
+            'sd_gb': ({'used': round(sd[0], 2), 'total': round(sd[1], 2), 'mount': SD_MNT, 'mounted': True}
+                      if sd else {'used': None, 'total': None, 'mount': SD_MNT, 'mounted': False}),
             'soc_temp_c': round(t, 1) if t is not None else None,
             'battery': {'pct': int(bat) if bat.isdigit() else None, 'status': bst,
                         'state': blabel, 'external_power': ext, 'current_ma': cur,
@@ -255,13 +274,15 @@ def render(cv, tick):
             ('RAM', f'{used}/{m["MemTotal"]}M', used / m['MemTotal']),
             ('SWAP', f'{sw}/{m["SwapTotal"]}M', sw / max(1, m['SwapTotal'])),
             ('DISK', f'{du:.1f}/{dt:.1f}G', du / dt),
+            ('SD', f'{sd[0]:.1f}/{sd[1]:.0f}G' if sd else 'NOT MOUNTED', sd[0] / sd[1] if sd else 1.0),
             ('SOC', f'{t:.0f}C' if t is not None else 'N/A', (t or 0) / 90),
             ('BATT', bval, int(bat) / 100 if bat.isdigit() else 0)]
     for name, val, frac in rows:
         col = 3 if frac < 0.7 else (5 if frac < 0.9 else 4)
         if name == 'BATT': col = bcol or (5 if frac > 0.3 else 4)
-        cv.text(4 + dx, y, name, 2); cv.text(40 + dx, y, val, 1); y += 9
-        cv.bar(4, y, LW - 8, 3, frac, col); y += 8
+        if name == 'SD' and not sd: col = 4
+        cv.text(4 + dx, y, name, 2); cv.text(40 + dx, y, val, 1 if name != 'SD' or sd else 4); y += 9
+        cv.bar(4, y, LW - 8, 3, frac, col); y += 6
 
     y += 2; cv.rect(4, y, LW - 8, 1, 7); y += 6
     cv.text(4 + dx, y, 'SERVICES', 6); y += 11
@@ -271,6 +292,12 @@ def render(cv, tick):
         info['services'][name.split(' :')[0].lower().replace(' ', '_')] = {'up': ok, 'port': int(name.rsplit(':', 1)[1])}
         cv.rect(4 + dx, y, 6, 7, 3 if ok else 4)
         cv.text(14 + dx, y, name, 1); cv.text(LW - 22 + dx, y, 'UP' if ok else 'DN', 3 if ok else 4); y += 11
+    web, ssh = http_ok('http://127.0.0.1:3000/api/healthz'), tcp_ok(2222)
+    info['services']['forgejo'] = {'up': web, 'port': 3000}
+    info['services']['forgejo_ssh'] = {'up': ssh, 'port': 2222}
+    ok = web and ssh
+    cv.rect(4 + dx, y, 6, 7, 3 if ok else (5 if web or ssh else 4))
+    cv.text(14 + dx, y, 'FORGEJO :3000/2222', 1); cv.text(LW - 22 + dx, y, 'UP' if ok else 'DN', 3 if ok else 4); y += 11
     ok = mg['up']
     info['services']['mesh'] = {'up': ok, 'port': None}
     cv.rect(4 + dx, y, 6, 7, 3 if ok else 4)

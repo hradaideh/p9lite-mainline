@@ -72,6 +72,7 @@
         <dl class="kv">
           <dt>Battery</dt><dd><span id="bpct">–</span> · <span class="batt-state" id="bstate">–</span></dd>
           <dt>Current</dt><dd id="bcur">–</dd>
+          <dt>Voltage</dt><dd id="bvolt">–</dd>
           <dt>Battery temp</dt><dd id="btemp">–</dd>
           <dt>Charger</dt><dd id="bext">–</dd>
         </dl>
@@ -116,8 +117,8 @@
 const $ = id => document.getElementById(id);
 const pct = (u, t) => t ? Math.min(100, 100 * u / t) : 0;
 const level = p => p < 70 ? 'var(--ok)' : p < 90 ? 'var(--warn)' : 'var(--bad)';
-const links = { nginx: ':8080/', home_assist: ':8123/' };
-const labels = { nginx: 'nginx', home_assist: 'Home Assistant', mesh: 'Cloudflare Mesh gateway' };
+const links = { nginx: ':8080/', home_assist: ':8123/', forgejo: ':3000/' };
+const labels = { nginx: 'nginx', home_assist: 'Home Assistant', forgejo: 'Forgejo', forgejo_ssh: 'Forgejo SSH', mesh: 'Cloudflare Mesh gateway' };
 
 function metric(name, val, p, color) {
   return `<div class="metric"><div class="row"><span>${name}</span><span class="val">${val}</span></div>
@@ -133,7 +134,10 @@ function render(d) {
     metric('CPU', d.cpu_pct.toFixed(1) + '%', d.cpu_pct) +
     metric('Memory', `${d.ram_mb.used} / ${d.ram_mb.total} MB`, pct(d.ram_mb.used, d.ram_mb.total)) +
     metric('Swap (zram)', `${d.swap_mb.used} / ${d.swap_mb.total} MB`, pct(d.swap_mb.used, d.swap_mb.total)) +
-    metric('Disk', `${d.disk_gb.used.toFixed(1)} / ${d.disk_gb.total.toFixed(1)} GB`, pct(d.disk_gb.used, d.disk_gb.total)) +
+    metric('Disk (eMMC)', `${d.disk_gb.used.toFixed(1)} / ${d.disk_gb.total.toFixed(1)} GB`, pct(d.disk_gb.used, d.disk_gb.total)) +
+    (!d.sd_gb ? '' : d.sd_gb.mounted
+      ? metric(`microSD <span class="sub">${d.sd_gb.mount}</span>`, `${d.sd_gb.used.toFixed(1)} / ${d.sd_gb.total.toFixed(0)} GB`, pct(d.sd_gb.used, d.sd_gb.total))
+      : metric(`microSD <span class="sub">${d.sd_gb.mount}</span>`, 'not mounted', 100, 'var(--bad)')) +
     (d.soc_temp_c == null ? '' : metric('SoC temp', d.soc_temp_c.toFixed(0) + ' °C', pct(d.soc_temp_c, 90))) +
     metric('Battery', (b.pct ?? '?') + '%', b.pct ?? 0, battColor);
 
@@ -141,7 +145,8 @@ function render(d) {
   $('bstate').textContent = b.state.charAt(0) + b.state.slice(1).toLowerCase();
   $('bstate').style.color = battColor;
   $('bcur').textContent = `${b.current_ma} mA ${b.state === 'CHARGING' ? 'in' : b.state === 'ON BATTERY' ? 'out' : ''}`.trim();
-  $('btemp').textContent = b.temp_c == null ? (b.voltage_mv ? b.voltage_mv + ' mV' : '–') : b.temp_c.toFixed(1) + ' °C';
+  $('bvolt').textContent = b.voltage_mv ? (b.voltage_mv / 1000).toFixed(2) + ' V' : '–';
+  $('btemp').textContent = b.temp_c == null ? '–' : b.temp_c.toFixed(1) + ' °C';
   $('bext').textContent = b.external_power ? 'Connected' : 'Not connected';
 
   $('ssid').textContent = `${d.wifi.ssid} (${d.wifi.state.toLowerCase()})`;
@@ -160,7 +165,7 @@ function render(d) {
   }
 
   $('svcs').innerHTML = Object.entries(d.services).map(([k, s]) =>
-    `<div class="svc">${s.port ? `<a href="${location.protocol}//${location.hostname}${links[k] || ':' + s.port + '/'}">${labels[k] || k} <span class="sub">:${s.port}</span></a>` : `<span>${labels[k] || k}</span>`}
+    `<div class="svc">${k === 'forgejo_ssh' ? `<span>${labels[k]} <span class="sub">ssh://git@${location.hostname}:${s.port}</span></span>` : s.port ? `<a href="${location.protocol}//${location.hostname}${links[k] || ':' + s.port + '/'}">${labels[k] || k} <span class="sub">:${s.port}</span></a>` : `<span>${labels[k] || k}</span>`}
      <span class="pill ${s.up ? '' : 'down'}">${s.up ? 'UP' : 'DOWN'}</span></div>`).join('');
 
   const t = new Date(d.time.replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
