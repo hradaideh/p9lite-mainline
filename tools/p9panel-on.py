@@ -19,8 +19,14 @@ backlight control on, but nothing is displayed. Findings:
     for the init list, not for pixel data, which also travels as long packets).
   - verified equal to the vendor: PLL test codes (tc10=00 tc14=10 tc15=33 tc17=02 tc1d=05 @19.2 MHz),
     escape divider 7, every DSS/DSI clock gate (CRG PEREN3/5, SCTRL SCPEREN1), host timing registers,
-    panel pinmux. The TE pin never toggles.
-Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation.
+    panel pinmux, per-lane D-PHY timing test codes (all 4 lanes: 3f 00 0e 09 09 09 03 04; clock lane
+    00 19 0e 0a 1a 08), DSS pixel-clock gates (GLB_PXL0_* = single-DSI/no-IFBC table), DSS/DSI resets
+    (all released), SCTRL DSS AXI/MMBUF clocks. The TE pin never toggles.
+  - also ruled out: PCTRL PERI_CTRL24 (USB3 PHY only), escape divider 14/28, auto clock lane off.
+  - the vendor takeover from the bootloader (dpe_set_fastboot / mipi_dsi_set_fastboot) only enables
+    clocks and DSS-internal clock/memory selects; under 4.4 long writes worked after it.
+Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
+running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
 import mmap, os, struct, sys, time
 
