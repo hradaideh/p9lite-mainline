@@ -25,6 +25,15 @@ backlight control on, but nothing is displayed. Findings:
   - also ruled out: PCTRL PERI_CTRL24 (USB3 PHY only), escape divider 14/28, auto clock lane off.
   - the vendor takeover from the bootloader (dpe_set_fastboot / mipi_dsi_set_fastboot) only enables
     clocks and DSS-internal clock/memory selects; under 4.4 long writes worked after it.
+  - PERI_CTRL23 bit 3 is a ULPS-exit PULSE in the vendor code (set, PHY_ULPS_CTRL=0xF, 1 ms,
+    PHY_ULPS_CTRL=0, clear) - not a clock to keep on. With the proper pulse on a fresh boot, long
+    packets are not lost but queue: the payload FIFO never reads empty again and packets are released
+    late (brightness readback lags one write behind), about one per bus turnaround.
+  - frames have a second blocker: TE never pulses on GPIO021, and with TE gating off (0x20040) the
+    LDI still never starts a frame.
+  - r16 (4.4) has no /dev/mem, no modules, no kprobes: a register diff needs a 4.4 build with
+    CONFIG_DEVMEM (vendor tree in p9build /work/vendor, or the Deck pmbootstrap setup).
+    Fresh 7.3.1 bootloader-state dump: k7/logs/dss-dump-7.3.1-fresh.txt (tools/p9dss-dump.py).
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
