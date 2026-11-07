@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+description="Status dashboard: phone LCD (fb0, or the bootloader DSS buffer on mainline) + nginx status.json/screen.png, incl. Cloudflare Mesh gateway"
+command=/usr/bin/python3
+command_args="/usr/local/bin/p9-display"
+command_background=true
+pidfile=/run/p9-display.pid
+output_log=/var/log/p9-display.log
+error_log=/var/log/p9-display.log
+retry="TERM/5/KILL/3"
+
+depend() {
+	after hisi-wifi docker
+}
+
+start_pre() {
+	export P9_BRIGHTNESS P9_INTERVAL
+}

@@ -2,15 +2,16 @@
 # Device-side configuration for running linux-huawei-venus-mainline under postmarketOS.
 pkgname=p9lite-mainline
 pkgver=1
-pkgrel=2
-pkgdesc="Huawei P9 lite mainline-kernel config: boot cmdline, boot_ok signal, Hi1102 init, HA firewall rule, Cloudflare Mesh forwarding/NAT"
+pkgrel=3
+pkgdesc="Huawei P9 lite mainline-kernel config: boot cmdline, boot_ok signal, Hi1102 init, HA firewall rule, Cloudflare Mesh forwarding/NAT, status display"
 arch="noarch"
 url="https://github.com/hradaideh/p9lite-mainline"
 license="MIT"
 depends="linux-huawei-venus-mainline"
 options="!check"
-# ships /etc/init.d/hisi-wifi on purpose (one small device package, no -openrc split)
-source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft"
+# ships /etc/init.d/hisi-wifi and p9-display on purpose (one small device package, no -openrc split)
+source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft
+	display/p9-display display/p9-display.initd display/p9-display.confd display/index.html"
 
 package() {
 	install -Dm644 "$srcdir"/deviceinfo "$pkgdir"/etc/deviceinfo
@@ -18,6 +19,10 @@ package() {
 	install -Dm755 "$srcdir"/hisi-wifi "$pkgdir"/etc/init.d/hisi-wifi
 	install -Dm644 "$srcdir"/60_homeassistant.nft "$pkgdir"/etc/nftables.d/60_homeassistant.nft
 	install -Dm644 "$srcdir"/70_mesh.nft "$pkgdir"/etc/nftables.d/70_mesh.nft
+	install -Dm755 "$srcdir"/p9-display "$pkgdir"/usr/local/bin/p9-display
+	install -Dm755 "$srcdir"/p9-display.initd "$pkgdir"/etc/init.d/p9-display
+	install -Dm644 "$srcdir"/p9-display.confd "$pkgdir"/etc/conf.d/p9-display
+	install -Dm644 "$srcdir"/index.html "$pkgdir"/srv/p9-web/index.html
 }
 sha512sums="
 57d4e42facd94280d840ff7f10f03aac77f1203e80d2aa28e568852c8dfedd4557aec7af351ae34ad5d9160f57af7b74b51a0f410ad1f623acdcdec51a9c948e  deviceinfo
@@ -25,4 +30,8 @@ sha512sums="
 5f7ff8409ef6476f196c226eadc51d0ae1dc57b95c0cba2d0256bc2e95e7d8f7fbce151f6e46e72fb83763dc3e3a1f5a3b6fc9acc5d3a0c5ee871d03057e0657  hisi-wifi
 3249e2526004ee4446402d219687f290bbc82b5077fbbbcc205141d79669f0b5739f71ff8a507b6e9677267ed5233f916150dcc8e1909971361eacc0d93288db  60_homeassistant.nft
 334c9bcf8ca5403ef6ea9f853d74c44c0f52113805c6e358bcd6db125d16b39c1aef7fd4ad0663d6584286872ecd9cd8432f7173af250fd5e2e9c763d7ccdf6f  70_mesh.nft
+aeaffe5876c6800cceaff2fafe424736038fc86c9fd3f59ed167f34fdc8be6fe9d5adf2aa01c56ccdc0ab34aa2910250b27c5efada66ee8ce38d35529cc0c19f  p9-display
+0e3227ce06b9cdf7153b7efeba2dd1417270eb301c0d0efda9c4466813f9dea77d414c2d7df797ee0f46b75972b806b637987c90456649c854b228daa8c9cd1f  p9-display.initd
+afca61dc0383513227ae2fb632eecc416e0fdd7dda25a71f4dfd7fa87cb7a6d211e85ac723163a2ec72201c20dc1ec6802ee71416da8a169fa83df8c871d926b  p9-display.confd
+4d55a10acaae1e5afb14eea82f2aaf1857253d4ea95fc9665cef45ad50070825942287f6fc6e4631f91b2fa11e513ecfd19ddaf5aa65cf93cfacc528a34ad207  index.html
 "
