@@ -6,10 +6,19 @@ hw_lcd_on() (drivers/huawei_platform/lcd/hw_lcd_panel.c) over /dev/mem:
 The rails (hi6522 ldo3/boost4/cpn1, WLED) are left on by the bootloader.
 Without this the panel keeps the bootloader's state: it answers reads but ignores writes, its TE
 line stays low and the LDI never starts a frame.
-  p9panel-on.py [brightness 0-255]
-STATUS (2026-11-07): work in progress. Reset + PHY clock + host reset work; long DSI packets still
-never leave the payload FIFO (HS and LP), so the on-cmds stall at the first one. Next: replay the
-vendor mipi_init (hisi_mipi_dsi.c: PHY reset, PLL/timing for 490 Mbit/s lanes) before sending."""
+  p9panel-on.py [brightness 0-255]      (P9_HS=1: send the on-cmds in high-speed mode)
+
+STATUS 2026-11-07, not working yet. Verified on the phone:
+  - bootloader leaves PCTRL PERI_CTRL23 bit 3 (DSI0 PHY ref/cfg clock) at 0 -> set here;
+    CRG gates clk_txdphy0_ref/cfg and pclk_dsi0 are on; PHY PLL test codes match the vendor
+    calculation for 980 Mbit/s lanes (tc10=00 tc14=10 tc15=33 tc17=02 tc1d=05, 19.2 MHz ref).
+  - a PHY restart (PHY_RSTZ 0->7) clears the stuck TX, but afterwards the transmitter sends exactly
+    one 32-bit payload word and stalls (HS or LP, continuous clock or not, HS write timeout off):
+    the 2nd on-cmd (ff 19 06 01) never leaves the payload FIFO.
+  - reads (DCS 0x06 + BTA) keep working; the panel scans and has TE enabled before the reset.
+Next suspects: DSS-side gating of the DSI byte clock (LDI/DSS clock domains, media CRG 0xE86C0000)
+and the vendor dss/ldi init order (DSS must be clocked and LDI configured before DSI TX).
+"""
 import mmap, os, struct, sys, time
 
 DT = "/proc/device-tree/boe_otm1906c_5p2_1080p_cmd/"
@@ -84,18 +93,28 @@ def main():
     # back, but every write is lost and long-packet payload sticks in the FIFO. Clock on, then reset
     # the DSI host core to flush whatever is stuck.
     wr(pctrl, 0x60, rd(pctrl, 0x60) | 1 << 3)
-    dw(0x04, 0); time.sleep(0.002); dw(0x04, 1); time.sleep(0.005)
+    # PHY restart as in the vendor mipi_init (PLL settings kept): without it the transmitter never
+    # sends a long packet, even with the clock back on.
+    dw(0x04, 0); dw(0xA0, 0); time.sleep(0.002); dw(0xA0, 7)
+    for _ in range(500):
+        st = dr(0xB0)
+        if st & 1 and st & 0xA90 == 0xA90:                      # PLL lock + 4 data lanes in stop state
+            break
+        time.sleep(0.001)
+    dw(0x04, 1); time.sleep(0.005)
     dr(0xBC); dr(0xC0)                                          # clear DSI error status
     reset(1); ms(2); reset(0); ms(3); reset(1); ms(4)           # first reset pulse
     ms(7)                                                       # LP-11
     reset(1); ms(8); reset(0); ms(9); reset(1); ms(10)          # second reset pulse
     ms(11)                                                      # TP reset -> LCD init
-    # The vendor sends these in low-power mode, but LP transmit never drains on this setup
-    # (payload FIFO stays full, LP reads end in a protocol-violation error); HS works.
-    dw(0x68, CMD_MODE_LP if os.environ.get("P9_LP") else CMD_MODE_HS)
+    dw(0x68, CMD_MODE_HS if os.environ.get("P9_HS") else CMD_MODE_LP)   # vendor: init cmds in LP
     cmds = on_cmds()
-    for dtype, payload, wait in cmds:
-        send(dtype, payload)
+    for n, (dtype, payload, wait) in enumerate(cmds):
+        try:
+            send(dtype, payload)
+        except SystemExit as e:
+            raise SystemExit("%s at on-cmd %d/%d: dtype %02x %s" % (e, n + 1, len(cmds), dtype,
+                                                                   " ".join("%02x" % x for x in payload)))
         time.sleep(wait)
     fifo_ready()
     dw(0x68, CMD_MODE_HS)
