@@ -529,6 +529,49 @@ static void __init p9_fix_emmc(void)
 }
 
 /*
+ * i2c4 (0xFDF0D000): fsa9682@26 USB switch, smartpa@31, hi6522 charger/LCD-power PMIC @6B.
+ * Mainline i2c-designware drives it once the node uses the snps compatible and has a clock:
+ *   - enable clk_i2c4 (PEREN2 bit 27); the bootloader already took it out of reset,
+ *   - drop the vendor clocks (hi6250 CRG provider does not exist) and register a fixed
+ *     120 MHz clock (DT clock-rate) for the device through clkdev,
+ *   - 100 kHz (driver default would be 400 kHz).
+ * The node's pinctrl-0 (GPIO037/038 -> func 1) is applied by the driver core; without it
+ * every address NACKs.
+ */
+#include <linux/clkdev.h>
+static void __init p9_fix_i2c4(void)
+{
+	struct device_node *np = of_find_node_by_path("/amba/i2c@FDF0D000");
+	void __iomem *crg = ioremap(P9_PERI_CRG, 0x1000);
+	struct property *pp;
+	struct clk_hw *hw;
+	static const u32 freq = 100000;
+
+	if (crg) {
+		writel(BIT(27), crg + 0x20);	/* PEREN2: clk_i2c4 */
+		pr_info("p9test: i2c4 gate on, PERSTAT2=0x%08x\n", readl(crg + 0x2c));
+		iounmap(crg);
+	}
+	if (!np) {
+		pr_err("p9test: no i2c@FDF0D000 node\n");
+		return;
+	}
+	pp = of_find_property(np, "clocks", NULL);
+	if (pp)
+		of_remove_property(np, pp);
+	pp = of_find_property(np, "clock-names", NULL);
+	if (pp)
+		of_remove_property(np, pp);
+	hw = clk_hw_register_fixed_rate(NULL, "p9_clk_i2c4", NULL, 0, 120000000);
+	if (!IS_ERR(hw))
+		clk_hw_register_clkdev(hw, NULL, "fdf0d000.i2c");
+	p9_set_prop_u32s(np, "clock-frequency", &freq, 1);
+	p9_set_prop_str(np, "compatible", "snps,designware-i2c");
+	pr_info("p9test: i2c4 node %pOF -> snps,designware-i2c, 120 MHz stand-in clock, 100 kHz\n", np);
+	of_node_put(np);
+}
+
+/*
  * USB device mode: replay the vendor PHY bring-up (drivers/usb/susb/dwc_otg_hi6250.c,
  * init_usb_otg_phy_hi6250 in device mode) and hand the Synopsys DWC OTG core at
  * 0xFF100000 to mainline dwc2 using the HiKey (hi6220) parameter set.
@@ -821,6 +864,7 @@ static int __init p9test_early(void)
 		return 0;	/* only ever poke Hi6250 MMIO */
 	p9_fix_ramoops_dt();
 	p9_fix_emmc();
+	p9_fix_i2c4();
 	p9_usb_phy_init();
 	p9_fix_usb_dt();
 	if (sdio_prep)
