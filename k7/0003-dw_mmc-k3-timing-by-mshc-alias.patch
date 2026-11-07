@@ -1,0 +1,14 @@
+--- a/drivers/mmc/host/dw_mmc-k3.c
++++ b/drivers/mmc/host/dw_mmc-k3.c
+@@ -213,7 +213,10 @@
+ 	u32 reg_value;
+ 	int ctrl_id;
+ 
+-	ctrl_id = host->mmc->index;
++	/* P9 Lite: vendor DT names the slots mshc1 (SD) / mshc2 (SDIO); mmc index follows probe order */
++	ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
++	if (ctrl_id < 0)
++		ctrl_id = host->mmc->index;
+ 	if (ctrl_id >= TIMING_MODE)
+ 		return -EINVAL;
+ 

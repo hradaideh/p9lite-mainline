@@ -717,9 +717,11 @@ static void __init p9_sdio_dt_prepare(void)
  * The bootloader leaves card power (PMIC LDO16 vmmc, LDO9 vqmmc, both 2.95 V), clk_sd/hclk_sd and
  * the resets in a usable state, but not the clock source: clk_sd_muxsys points at the PLL path
  * (ppll3 / 4), whose "AP" branch needs an LPM3 IPC request that mainline never sends.
- * ponytail: run from clk_factor_mmc0 = 19.2 MHz / 6 = 3.2 MHz (always on; the vendor also uses it for
- * the 400 kHz LEGACY mode). dw_mmc-k3 divides by 8, so the card clock is 400 kHz (~200 KB/s);
- * enable a PLL branch via LPM3 for 25/50 MHz. No regulator/GPIO drivers bind here, so vmmc/vqmmc and
+ * Clock: clk_sd_muxpll = ppll3 (1.6 GHz) / 4 = 400 MHz; dw_mmc-k3 divides by 8 -> 50 MHz bus_hz, and
+ * CLKDIV gives 400 kHz for init. The rate must be the real one: dw_mmc derives the data timeout from it
+ * (a stand-in of 3.2 MHz made every multi-block read time out at 50 MHz).
+ * ponytail: ppll3 is left running by the bootloader/LPM3; the vendor votes for it over LPM3 IPC
+ * (0xd0002/3) - add that if it is ever found off. No regulator/GPIO drivers bind here, so vmmc/vqmmc and
  * cd-gpio are dropped and the core polls for the card (broken-cd).
  * Node left disabled at boot; probe on demand: echo 1 > /sys/kernel/debug/p9test/sd
  */
@@ -736,7 +738,7 @@ static void __init p9_sd_dt_prepare(void)
 		pr_err("p9test: no %s node\n", P9_SD_NODE);
 		return;
 	}
-	p9_fixed_clk_for("clk_sd", 3200000);
+	p9_fixed_clk_for("clk_sd", 400000000);
 	p9_fixed_clk_for("hclk_sd", 120000000);
 	for (i = 0; i < ARRAY_SIZE(drop); i++) {
 		pp = of_find_property(np, drop[i], NULL);
@@ -746,7 +748,7 @@ static void __init p9_sd_dt_prepare(void)
 	p9_set_prop_str(np, "compatible", "hisilicon,hi3660-dw-mshc");
 	p9_set_prop_str(np, "status", "disabled");
 	p9_set_prop_u32s(np, "bus-width", (const u32[]){ 4 }, 1);
-	p9_set_prop_u32s(np, "max-frequency", (const u32[]){ 3200000 }, 1);
+	p9_set_prop_u32s(np, "max-frequency", (const u32[]){ 50000000 }, 1);
 	for (i = 0; i < ARRAY_SIZE(flags); i++) {
 		struct property *p = kzalloc(sizeof(*p), GFP_KERNEL);
 
@@ -767,7 +769,8 @@ static int p9_sd_bringup(void)
 
 	if (!crg)
 		return -ENOMEM;
-	writel(0 | (BIT(6) << 16), crg + 0xb8);		/* clk_sd_muxsys = clk_factor_mmc0 (hiword mask) */
+	writel((0x3f << 16) | 3 << 4 | 3, crg + 0xb8);	/* clk_sd_muxpll = ppll3, div /4 (hiword mask) */
+	writel(BIT(6) << 16 | BIT(6), crg + 0xb8);	/* clk_sd_muxsys = PLL branch */
 	writel(BIT(17), crg + 0x40);			/* clk_sd  (PEREN4) */
 	writel(BIT(30), crg + 0x00);			/* hclk_sd (PEREN0) */
 	writel(BIT(18) | BIT(24), crg + 0x94);		/* RSTDIS4: SD controller + SD_M */
