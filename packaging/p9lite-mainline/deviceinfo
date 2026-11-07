@@ -1,0 +1,6 @@
+# Overrides /usr/share/deviceinfo/deviceinfo for linux-huawei-venus-mainline (sourced after it).
+# console=tty0: the bootloader appends console=ttyS0, which matches no UART on 7.x.
+# p9early + p9test.prod: boot keypoint 250, crash marker, resets -> fastboot until boot_ok.
+deviceinfo_kernel_cmdline="console=tty0 panic=10 p9test.prod=1 p9test.sdio_prep=1 p9early"
+# boot-deploy writes /boot/boot.img to the boot partition after every kernel/initramfs update.
+deviceinfo_flash_kernel_on_update="true"

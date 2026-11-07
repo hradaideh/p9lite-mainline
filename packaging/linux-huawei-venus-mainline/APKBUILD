@@ -1,0 +1,27 @@
+# Maintainer: hradaideh <hradaideh@users.noreply.github.com>
+# Mainline kernel for the Huawei P9 lite (hi6250), prebuilt in the p9build container from
+# linux-7.3.1 + k7 patches/configs (see ../../k7, ../build-kernel-artifacts.sh). Binary package:
+# vmlinuz is the stubbed Image (mkstub.py: real Image at 0x600000), modules include the Hi1102 driver.
+pkgname=linux-huawei-venus-mainline
+pkgver=7.3.1
+pkgrel=1
+pkgdesc="Mainline Linux for Huawei P9 lite with p9test boot guard and Hi1102 Wi-Fi"
+arch="aarch64"
+url="https://github.com/hradaideh/p9lite-mainline"
+license="GPL-2.0-only"
+provides="linux-huawei-venus=$pkgver-r$pkgrel"
+replaces="linux-huawei-venus"
+options="!strip !check !tracedeps"
+source="kernel-artifacts-$pkgver.tgz"
+builddir="$srcdir"
+
+package() {
+	install -Dm644 vmlinuz "$pkgdir"/boot/vmlinuz
+	install -Dm644 kernel.release "$pkgdir"/usr/share/kernel/huawei-venus/kernel.release
+	install -Dm644 config "$pkgdir"/usr/share/kernel/huawei-venus/config
+	mkdir -p "$pkgdir"/usr/lib
+	cp -a mod/lib/modules "$pkgdir"/usr/lib/
+}
+sha512sums="
+ab79c27e54635726fd17e8c637bf0ae758d488d9eb4a0ae01bdd0f8620c74a92746587708f234c502cffdc507216bce6d0e41c9de8d976bf968e42f9b1bd9228  kernel-artifacts-7.3.1.tgz
+"

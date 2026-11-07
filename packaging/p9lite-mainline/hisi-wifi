@@ -1,0 +1,68 @@
+#!/sbin/openrc-run
+description="Bring up HiSilicon Hi1102 WiFi and connect via wpa_supplicant (P2P disabled)"
+
+: ${IP_MODE:=dhcp}
+: ${WPA_CONF:=/etc/wpa_supplicant/wpa_supplicant.conf}
+
+depend() {
+	need udev localmount
+	after bootmisc
+	before networkmanager
+}
+
+# Mainline (7.x) only: the vendor board code that powers the chip is not there. p9test powers the Hi1102
+# and rescans SDIO; the driver is out of tree in /lib/modules/$(uname -r)/extra. No-op on the 4.4 kernel.
+prepare_mainline() {
+	[ -e /sys/module/p9test ] || return 0
+	grep -q " /sys/kernel/debug " /proc/mounts || mount -t debugfs debugfs /sys/kernel/debug
+	if ! grep -qs 0x0296 /sys/bus/sdio/devices/*/vendor; then
+		echo 1 > /sys/kernel/debug/p9test/sdio || return 1
+		i=0; while ! grep -qs 0x0296 /sys/bus/sdio/devices/*/vendor && [ $i -lt 15 ]; do sleep 1; i=$((i+1)); done
+		grep -qs 0x0296 /sys/bus/sdio/devices/*/vendor || { eerror "Hi1102 did not enumerate on SDIO"; return 1; }
+	fi
+	mkdir -p /data/misc/wifi
+	for m in plat wifi; do
+		grep -q "^$m " /proc/modules || insmod "/lib/modules/$(uname -r)/extra/$m.ko" || return 1
+	done
+	i=0; while [ ! -e /sys/hisys/boot/plat ] && [ $i -lt 10 ]; do sleep 1; i=$((i+1)); done
+}
+
+start() {
+	ebegin "Initializing hisi wlan"
+	prepare_mainline || { eend 1; return 1; }
+	[ "$(cat /sys/hisys/boot/plat)" = "running" ] || echo init > /sys/hisys/boot/plat
+	# wifi init after a failed plat init oopses in the driver's error path
+	[ "$(cat /sys/hisys/boot/plat)" = "running" ] || { eend 1 "plat init failed"; return 1; }
+	[ "$(cat /sys/hisys/boot/wifi)" = "running" ] || echo init > /sys/hisys/boot/wifi
+	i=0; while [ ! -e /sys/class/net/wlan0 ] && [ $i -lt 20 ]; do sleep 1; i=$((i+1)); done
+	ip link set wlan0 up
+	eend $? || return 1
+
+	ebegin "Starting wpa_supplicant on wlan0"
+	start-stop-daemon --start --exec /usr/sbin/wpa_supplicant -- \
+		-B -D nl80211 -i wlan0 -c "$WPA_CONF" -P /run/wpa_supplicant.wlan0.pid
+	eend $? || return 1
+
+	if [ "$IP_MODE" = "static" ]; then
+		ebegin "Configuring static IP ${IP_ADDR} on wlan0"
+		ip -4 addr flush dev wlan0
+		ip -4 addr add "$IP_ADDR" dev wlan0
+		ip route replace default via "$IP_GW" dev wlan0
+		{ for d in $IP_DNS; do echo "nameserver $d"; done; } > /etc/resolv.conf
+		eend $?
+	else
+		ebegin "Starting DHCP on wlan0"
+		udhcpc -i wlan0 -b -p /run/udhcpc.wlan0.pid >/dev/null 2>&1
+		eend $?
+	fi
+}
+
+stop() {
+	# Never "echo deinit" to /sys/hisys/boot/wifi: it hangs this driver.
+	ebegin "Stopping wlan0 clients"
+	[ -f /run/udhcpc.wlan0.pid ] && kill "$(cat /run/udhcpc.wlan0.pid)" 2>/dev/null
+	[ -f /run/wpa_supplicant.wlan0.pid ] && kill "$(cat /run/wpa_supplicant.wlan0.pid)" 2>/dev/null
+	rm -f /run/udhcpc.wlan0.pid /run/wpa_supplicant.wlan0.pid
+	ip -4 addr flush dev wlan0 2>/dev/null
+	eend 0
+}

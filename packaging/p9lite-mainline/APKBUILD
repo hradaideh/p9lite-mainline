@@ -1,0 +1,26 @@
+# Maintainer: hradaideh <hradaideh@users.noreply.github.com>
+# Device-side configuration for running linux-huawei-venus-mainline under postmarketOS.
+pkgname=p9lite-mainline
+pkgver=1
+pkgrel=1
+pkgdesc="Huawei P9 lite mainline-kernel config: boot cmdline, boot_ok signal, Hi1102 init, HA firewall rule"
+arch="noarch"
+url="https://github.com/hradaideh/p9lite-mainline"
+license="MIT"
+depends="linux-huawei-venus-mainline"
+options="!check"
+# ships /etc/init.d/hisi-wifi on purpose (one small device package, no -openrc split)
+source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft"
+
+package() {
+	install -Dm644 "$srcdir"/deviceinfo "$pkgdir"/etc/deviceinfo
+	install -Dm755 "$srcdir"/p9-boot-ok.start "$pkgdir"/etc/local.d/p9-boot-ok.start
+	install -Dm755 "$srcdir"/hisi-wifi "$pkgdir"/etc/init.d/hisi-wifi
+	install -Dm644 "$srcdir"/60_homeassistant.nft "$pkgdir"/etc/nftables.d/60_homeassistant.nft
+}
+sha512sums="
+57d4e42facd94280d840ff7f10f03aac77f1203e80d2aa28e568852c8dfedd4557aec7af351ae34ad5d9160f57af7b74b51a0f410ad1f623acdcdec51a9c948e  deviceinfo
+391dbcc93cc0010fa0b20dd1d5208a5c3244e2a9d39029128f8aac3297df765229339745e6cc59076b832051f57f498c56fcd0b573ed2a6b91506f2d9f848f90  p9-boot-ok.start
+5f7ff8409ef6476f196c226eadc51d0ae1dc57b95c0cba2d0256bc2e95e7d8f7fbce151f6e46e72fb83763dc3e3a1f5a3b6fc9acc5d3a0c5ee871d03057e0657  hisi-wifi
+3249e2526004ee4446402d219687f290bbc82b5077fbbbcc205141d79669f0b5739f71ff8a507b6e9677267ed5233f916150dcc8e1909971361eacc0d93288db  60_homeassistant.nft
+"

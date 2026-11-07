@@ -1,0 +1,13 @@
+init: allow 128 boot env vars (Huawei bootloader appends ~31 dot-less key=value params; 32 panics in start_kernel)
+
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -237,7 +237,7 @@
+ 
+ config INIT_ENV_ARG_LIMIT
+ 	int
+-	default 32 if !UML
++	default 128 if !UML
+ 	default 128 if UML
+ 	help
+ 	  Maximum of each of the number of arguments and environment

@@ -1,0 +1,963 @@
+diff --git a/hisi/bfgx/bfgx_data_parse.c b/hisi/bfgx/bfgx_data_parse.c
+index 2cb7da8..6abf81a 100755
+--- a/hisi/bfgx/bfgx_data_parse.c
++++ b/hisi/bfgx/bfgx_data_parse.c
+@@ -1451,7 +1451,7 @@ int32 ps_core_recv(void *disc_data, const uint8 *data, int32 count)
+     {
+         if(NULL != ps_core_d->rx_data_fp)
+         {
+-            vfs_write(ps_core_d->rx_data_fp, data, count, &ps_core_d->rx_data_fp->f_pos);
++            kernel_write(ps_core_d->rx_data_fp, data, count, &ps_core_d->rx_data_fp->f_pos);
+         }
+         else
+         {
+diff --git a/hisi/bfgx/bfgx_dev.c b/hisi/bfgx/bfgx_dev.c
+index e2d2650..b769895 100755
+--- a/hisi/bfgx/bfgx_dev.c
++++ b/hisi/bfgx/bfgx_dev.c
+@@ -2578,7 +2578,7 @@ int32 plat_dump_rotate_cmd_read(uint64 arg)
+ 
+     struct sk_buff  *skb =NULL;
+ 
+-    if (!access_ok(VERIFY_WRITE, puser, (int32)sizeof(uint32)))
++    if (!access_ok(puser, (int32)sizeof(uint32)))
+     {
+         PS_PRINT_ERR("address can not write\n");
+         return -EINVAL;
+@@ -3857,9 +3857,10 @@ static struct of_device_id hi1101_ps_match_table[] = {
+ 
+ /**********************************************************/
+ /*  platform_driver struct for PS module */
++static void p9_ps_remove(struct platform_device *p) { ps_remove(p); }
+ STATIC struct platform_driver ps_platform_driver = {
+         .probe      = ps_probe,
+-        .remove     = ps_remove,
++        .remove     = p9_ps_remove,
+         .suspend    = ps_suspend,
+         .resume     = ps_resume,
+         .driver     = {
+diff --git a/hisi/bfgx/bfgx_exception_rst.c b/hisi/bfgx/bfgx_exception_rst.c
+index 62f8afd..01a8aa5 100755
+--- a/hisi/bfgx/bfgx_exception_rst.c
++++ b/hisi/bfgx/bfgx_exception_rst.c
+@@ -251,6 +251,7 @@ extern struct oal_sdio* oal_alloc_sdio_stru(oal_void);
+   2 函数实现
+ *****************************************************************************/
+ void  bfgx_beat_timer_expire(uint64 data);
++static void p9_bfgx_beat_cb(struct timer_list *t) { bfgx_beat_timer_expire(0); }
+ int32 get_exception_info_reference(struct st_exception_info **exception_data);
+ int32 plat_exception_handler(uint32 subsys_type, uint32 thread_type, uint32 exception_type);
+ void  plat_exception_reset_work(struct work_struct *work);
+@@ -1949,7 +1950,7 @@ int32 bfgx_store_stack_mem_to_file(void)
+         set_fs(KERNEL_DS);
+         //l_ret = vfs_llseek(fp, 0, SEEK_END);
+         PS_PRINT_INFO("pos = %d\n", (int)fp->f_pos);
+-        vfs_write(fp, pst_mem_info->exception_mem_addr, pst_mem_info->recved_size, &fp->f_pos);
++        kernel_write(fp, pst_mem_info->exception_mem_addr, pst_mem_info->recved_size, &fp->f_pos);
+         set_fs(fs);
+ 
+         filp_close(fp, NULL);
+@@ -2202,7 +2203,7 @@ int32 __store_wifi_mem_to_file(void)
+         set_fs(KERNEL_DS);
+         //l_ret = vfs_llseek(fp, 0, SEEK_END);
+         PS_PRINT_INFO("pos = %d\n", (int)fp->f_pos);
+-        vfs_write(fp, pst_mem_info->exception_mem_addr + offset, block_size, &fp->f_pos);
++        kernel_write(fp, pst_mem_info->exception_mem_addr + offset, block_size, &fp->f_pos);
+         set_fs(fs);
+ 
+         filp_close(fp, NULL);
+@@ -2681,7 +2682,7 @@ int32 sdio_get_and_save_data(exception_bcpu_dump_msg* sdio_read_info, uint32 cou
+                 goto exit;
+             }
+ 
+-            vfs_write(fp, st_bcpu_dump_buff.mem_addr, st_bcpu_dump_buff.data_len, &fp->f_pos);
++            kernel_write(fp, st_bcpu_dump_buff.mem_addr, st_bcpu_dump_buff.data_len, &fp->f_pos);
+ 
+             index += send_len;
+ 
+@@ -3222,10 +3223,8 @@ int32 plat_exception_reset_init(void)
+     INIT_WORK(&p_exception_data->uart_store_wifi_mem_to_file_work, store_wifi_mem_to_file_work);
+ 
+     /*初始化心跳timer*/
+-    init_timer(&p_exception_data->bfgx_beat_timer);
+-    p_exception_data->bfgx_beat_timer.function = bfgx_beat_timer_expire;
++    timer_setup(&p_exception_data->bfgx_beat_timer, p9_bfgx_beat_cb, 0);
+     p_exception_data->bfgx_beat_timer.expires  = jiffies + BFGX_BEAT_TIME*HZ;
+-    p_exception_data->bfgx_beat_timer.data     = 0;
+ 
+     /*初始化异常处理自旋锁*/
+     spin_lock_init(&p_exception_data->exception_spin_lock);
+diff --git a/hisi/common/customize/hisi_ini.c b/hisi/common/customize/hisi_ini.c
+index d129b70..6507b39 100755
+--- a/hisi/common/customize/hisi_ini.c
++++ b/hisi/common/customize/hisi_ini.c
+@@ -46,7 +46,7 @@ static int32 ko_read_line(INI_FILE *fp, char *addr)
+     int8  auc_tmp[MAX_READ_LINE_NUM] = {0};
+     int32 cnt = 0;
+ 
+-    l_ret = kernel_read(fp, fp->f_pos, auc_tmp, MAX_READ_LINE_NUM);
++    l_ret = p9_kernel_read_at(fp, fp->f_pos, auc_tmp, MAX_READ_LINE_NUM);
+     if (0 > l_ret)
+     {
+         INI_ERROR("kernel_line read l_ret < 0");
+diff --git a/hisi/common/oneimage/oneimage.c b/hisi/common/oneimage/oneimage.c
+index 08b2224..64822b1 100755
+--- a/hisi/common/oneimage/oneimage.c
++++ b/hisi/common/oneimage/oneimage.c
+@@ -64,7 +64,7 @@ bool is_my_chip(void)
+ bool is_my_nfc_chip(void)
+ {
+ #ifdef CONFIG_HWCONNECTIVITY
+-    if (!isMyNfcChip(NFC_CHIP_TYPE_HI110X)) {
++    if (!0 /* p9: no Hi110x NFC on VNS-L21 */) {
+         PS_PRINT_ERR("cfg dev board nfc chip type is not match, skip driver init\n");
+         return false;
+     } else {
+@@ -256,26 +256,21 @@ static ssize_t hwconn_read_proc_firmware(struct file *filp, char __user *buffer,
+ }
+ 
+ 
+-static const struct file_operations hwconn_proc_fops[]= {
++static const struct proc_ops hwconn_proc_fops[]= {
+     {
+-       .owner = THIS_MODULE,
+-       .read = hwconn_read_proc_chiptype,
++       .proc_read = hwconn_read_proc_chiptype,
+     },
+     {
+-        .owner = THIS_MODULE,
+-        .read = hwconn_read_proc_supp,
++        .proc_read = hwconn_read_proc_supp,
+     },
+     {
+-        .owner = THIS_MODULE,
+-        .read = hwconn_read_proc_p2p,
++        .proc_read = hwconn_read_proc_p2p,
+     },
+     {
+-        .owner = THIS_MODULE,
+-        .read = hwconn_read_proc_apd,
++        .proc_read = hwconn_read_proc_apd,
+     },
+         {
+-        .owner = THIS_MODULE,
+-        .read = hwconn_read_proc_firmware,
++        .proc_read = hwconn_read_proc_firmware,
+     },
+     {},
+ };
+diff --git a/hisi/platform/Makefile b/hisi/platform/Makefile
+index 5ac4cdc..81e537b 100755
+--- a/hisi/platform/Makefile
++++ b/hisi/platform/Makefile
+@@ -105,6 +105,7 @@ plat-objs += $(board-objs)
+ plat-objs += $(oneimage-objs)
+ plat-objs += $(customize-objs)
+ plat-objs += $(driver-objs)
++plat-objs += p9_vendor_stubs.o
+ 
+ #plat ko
+ ifeq ($(CONFIG_HI110X_KERNEL_MODULES_BUILD_SUPPORT), yes)
+diff --git a/hisi/platform/board/board.c b/hisi/platform/board/board.c
+index b999013..9336fb3 100755
+--- a/hisi/platform/board/board.c
++++ b/hisi/platform/board/board.c
+@@ -205,6 +205,12 @@ int32 set_board_pmu_clk32k(struct platform_device *pdev)
+ 	dev = &pdev->dev;
+ 	clk_name = g_board_info.clk_32k_name;
+ 	clk = devm_clk_get(dev, "clk_pmu32kb");
++	if (IS_ERR(clk)) {
++		/* p9: no Hi6250 clock driver in mainline; p9test turns on PMIC 0x121 bit 1 (clk_pmu32kb) */
++		PS_PRINT_INFO("32k clk not provided (%ld), assuming PMIC already enables it\n", PTR_ERR(clk));
++		g_board_info.clk_32k = NULL;
++		return BOARD_SUCC;
++	}
+     if (NULL == clk)
+ 	{
+         PS_PRINT_ERR("Get 32k clk %s failed!!!\n", clk_name);
+@@ -1426,9 +1432,10 @@ static struct of_device_id hi110x_board_match_table[] = {
+ };
+ #endif
+ 
++static void p9_board_remove(struct platform_device *p) { hi110x_board_remove(p); }
+ STATIC struct platform_driver hi110x_board_driver = {
+         .probe      = hi110x_board_probe,
+-        .remove     = hi110x_board_remove,
++        .remove     = p9_board_remove,
+         .suspend    = hi110x_board_suspend,
+         .resume     = hi110x_board_resume,
+         .driver     = {
+diff --git a/hisi/platform/driver/plat_uart.c b/hisi/platform/driver/plat_uart.c
+index 61c528e..4870d8a 100755
+--- a/hisi/platform/driver/plat_uart.c
++++ b/hisi/platform/driver/plat_uart.c
+@@ -90,7 +90,7 @@ STATIC void ps_uart_state_get(struct tty_struct *tty)
+     }
+ 
+     memcpy(&g_uart_state.uart_cnt, &state->uart_port->icount, sizeof(struct uart_icount));
+-    g_uart_state.tty_stopped = tty->stopped;
++    g_uart_state.tty_stopped = tty->flow.stopped;
+     g_uart_state.tty_hw_stopped = tty->hw_stopped;
+ 
+     return;
+@@ -657,12 +657,15 @@ int32 release_tty_drv(void *pm_data)
+     return error;
+ }
+ 
++static void p9_tty_receive(struct tty_struct *t, const u8 *cp, const u8 *fp, size_t n)
++{ ps_tty_receive(t, cp, (int8 *)fp, (int32)n); }
++/* ldisc 35 is beyond NR_LDISCS (31) in 7.x; N_DEVELOPMENT is the out-of-tree slot */
+ STATIC struct tty_ldisc_ops ps_ldisc_ops = {
+-    .magic          = TTY_LDISC_MAGIC,
++    .num            = N_DEVELOPMENT,
+     .name           = "n_ps",
+     .open           = ps_tty_open,
+     .close          = ps_tty_close,
+-    .receive_buf    = ps_tty_receive,
++    .receive_buf    = p9_tty_receive,
+     .write_wakeup   = ps_tty_wakeup,
+     .flush_buffer   = ps_tty_flush_buffer,
+     .owner          = THIS_MODULE
+@@ -672,11 +675,12 @@ int32 plat_uart_init(void)
+ {
+     mutex_init(&g_tty_mutex);
+ 
+-    return tty_register_ldisc(N_HW_BFG, &ps_ldisc_ops);
++    return tty_register_ldisc(&ps_ldisc_ops);
+ }
+ 
+ int32 plat_uart_exit(void)
+ {
+-    return tty_unregister_ldisc(N_HW_BFG);
++    tty_unregister_ldisc(&ps_ldisc_ops);
++    return 0;
+ }
+ 
+diff --git a/hisi/platform/frw/frw_event_main.c b/hisi/platform/frw/frw_event_main.c
+index 29c94f3..8e01edc 100755
+--- a/hisi/platform/frw/frw_event_main.c
++++ b/hisi/platform/frw/frw_event_main.c
+@@ -1392,7 +1392,7 @@ oal_void  frw_event_dump_event(oal_uint8 *puc_event)
+     修改内容   : 新生成函数
+ 
+ *****************************************************************************/
+-OAL_STATIC oal_void  frw_event_get_info_from_event_queue(frw_event_queue_stru *pst_event_queue)
++oal_void  frw_event_get_info_from_event_queue(frw_event_queue_stru *pst_event_queue)
+ {
+     frw_event_stru              *pst_event;
+     oal_queue_stru              *pst_queue;
+@@ -1909,8 +1909,6 @@ oal_uint8 frw_task_thread_condition_check(oal_uint32 ul_core_id)
+ }
+ 
+ /*lint -e578*//*lint -e19*/
+-oal_module_symbol(frw_event_alloc);
+-oal_module_symbol(frw_event_free);
+ oal_module_symbol(frw_event_dispatch_event);
+ oal_module_symbol(frw_event_post_event);
+ oal_module_symbol(frw_event_table_register);
+diff --git a/hisi/platform/oal/oal_cfg80211.c b/hisi/platform/oal/oal_cfg80211.c
+index 7a4b86c..c7fd35f 100755
+--- a/hisi/platform/oal/oal_cfg80211.c
++++ b/hisi/platform/oal/oal_cfg80211.c
+@@ -865,7 +865,7 @@ oal_cfg80211_bss_stru *oal_cfg80211_inform_bss_frame(
+ *****************************************************************************/
+ oal_void  oal_cfg80211_scan_done(oal_cfg80211_scan_request_stru *pst_cfg80211_scan_request,oal_int8 c_aborted)
+ {
+-    return cfg80211_scan_done(pst_cfg80211_scan_request,c_aborted);
++    { struct cfg80211_scan_info __si = { .aborted = (c_aborted != 0) }; cfg80211_scan_done(pst_cfg80211_scan_request, &__si); }
+ }
+ 
+ 
+@@ -1016,10 +1016,17 @@ oal_uint32  oal_cfg80211_roamed(
+                         oal_gfp_enum_uint8           en_gfp)
+ {
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+-    cfg80211_roamed(pst_net_device, pst_channel, puc_bssid,
+-                    puc_req_ie, ul_req_ie_len,
+-                    puc_resp_ie, ul_resp_ie_len, en_gfp);
+-
++    {
++        struct cfg80211_roam_info __ri = {
++            .links[0].channel = pst_channel,
++            .links[0].bssid   = puc_bssid,
++            .req_ie           = puc_req_ie,
++            .req_ie_len       = ul_req_ie_len,
++            .resp_ie          = puc_resp_ie,
++            .resp_ie_len      = ul_resp_ie_len,
++        };
++        cfg80211_roamed(pst_net_device, &__ri, en_gfp);
++    }
+     return OAL_SUCC;
+ 
+ #else
+@@ -1082,7 +1089,7 @@ oal_uint32  oal_cfg80211_new_sta(
+ #endif
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+-    cfg80211_new_sta(pst_net_device, puc_mac_addr, pst_station_info, en_gfp);
++    cfg80211_new_sta(pst_net_device->ieee80211_ptr, puc_mac_addr, pst_station_info, en_gfp);
+ 
+     return OAL_SUCC;
+ #else
+@@ -1235,7 +1242,7 @@ oal_uint32  oal_cfg80211_del_sta(oal_net_device_stru *pst_net_device,
+ #endif
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,44))
+-    cfg80211_del_sta(pst_net_device, puc_mac_addr, en_gfp);
++    cfg80211_del_sta(pst_net_device->ieee80211_ptr, puc_mac_addr, en_gfp);
+ 
+     return OAL_SUCC;
+ #else
+diff --git a/hisi/platform/oal/oal_hcc_test.c b/hisi/platform/oal/oal_hcc_test.c
+index 37c4574..bbde79a 100755
+--- a/hisi/platform/oal/oal_hcc_test.c
++++ b/hisi/platform/oal/oal_hcc_test.c
+@@ -170,7 +170,7 @@ oal_int32 hcc_flowctrl_info_print(struct hcc_handler* hcc,char* buf, oal_int32 b
+ #ifdef CONFIG_MMC
+     hi_sdio = (struct oal_sdio*)hcc->hi_sdio;
+     if(hi_sdio->func->card->host->claimer)
+-        ret +=  snprintf(buf + ret , buf_len - ret,"claim host name:%s\n", hi_sdio->func->card->host->claimer->comm);
++        ret +=  snprintf(buf + ret , buf_len - ret,"claim host name:%s\n", (hi_sdio->func->card->host->claimer->task ? hi_sdio->func->card->host->claimer->task->comm : "?"));
+ #else
+     OAL_REFERENCE(hi_sdio);
+ #endif
+diff --git a/hisi/platform/oal/oal_kernel_file.c b/hisi/platform/oal/oal_kernel_file.c
+index e10b6f0..b0283f6 100755
+--- a/hisi/platform/oal/oal_kernel_file.c
++++ b/hisi/platform/oal/oal_kernel_file.c
+@@ -129,7 +129,7 @@ oal_void *oal_kernel_file_read(oal_file *pst_file,loff_t ul_fsize)
+ 
+     pos = &(pst_file->f_pos);
+     pst_buff = (char *)kmalloc(ul_fsize+100,GFP_KERNEL);
+-    vfs_read(pst_file,pst_buff,ul_fsize,pos);
++    kernel_read(pst_file,pst_buff,ul_fsize,pos);
+ 
+     return pst_buff;
+ }
+@@ -155,7 +155,7 @@ oal_int oal_kernel_file_write(oal_file *pst_file,oal_uint8 *pst_buf,loff_t fsize
+ {
+     loff_t *pst_pos = &(pst_file->f_pos);
+ 
+-    vfs_write(pst_file,pst_buf,fsize,pst_pos);
++    kernel_write(pst_file,pst_buf,fsize,pst_pos);
+ 
+     return OAL_SUCC;
+ }
+diff --git a/hisi/platform/oal/oal_mem.c b/hisi/platform/oal/oal_mem.c
+index 2f0438c..461a951 100755
+--- a/hisi/platform/oal/oal_mem.c
++++ b/hisi/platform/oal/oal_mem.c
+@@ -101,7 +101,7 @@ oal_uint32 gul_dscr_fstphy_addr = 0;
+ OAL_STATIC oal_mem_stat g_st_mem_stat;
+ oal_mempool_info_to_sdt_stru    g_st_mempool_info = {0};
+ #ifdef _PRE_DEBUG_MODE
+-OAL_STATIC oal_mempool_tx_dscr_addr    g_st_tx_dscr_addr;
++oal_mempool_tx_dscr_addr    g_st_tx_dscr_addr;
+ #endif
+ /******************************************************************************
+     共享描述符内存池配置信息全局变量
+@@ -334,9 +334,9 @@ OAL_STATIC oal_netbuf_stru **g_ppst_sdt_netbuf_stack_mem;
+                                       OAL_MEM_SDT_NETBUF_BLK_TOTAL_CNT * OAL_MEM_NETBUF_CTRL_BLK_SIZE)
+ 
+ 
+-OAL_STATIC oal_netbuf_stru *g_pst_netbuf_base_addr[OAL_MEM_NETBUF_BLK_TOTAL_CNT] = {OAL_PTR_NULL};
++oal_netbuf_stru *g_pst_netbuf_base_addr[OAL_MEM_NETBUF_BLK_TOTAL_CNT] = {OAL_PTR_NULL};
+ 
+-OAL_STATIC oal_netbuf_stru *g_pst_sdt_netbuf_base_addr[OAL_MEM_SDT_NETBUF_BLK_TOTAL_CNT] = {OAL_PTR_NULL};
++oal_netbuf_stru *g_pst_sdt_netbuf_base_addr[OAL_MEM_SDT_NETBUF_BLK_TOTAL_CNT] = {OAL_PTR_NULL};
+ 
+ /*****************************************************************************
+   结构名  : oal_mem_ctrl_blk_stru
+@@ -581,7 +581,7 @@ OAL_STATIC oal_netbuf_stru* oal_mem_find_available_netbuf(oal_mem_subpool_stru *
+     {
+         us_top--;
+         pst_netbuf = (oal_netbuf_stru *)pst_mem_subpool->ppst_free_stack[us_top];
+-        if (1 == oal_atomic_read(&pst_netbuf->users))
++        if (1 == refcount_read(&pst_netbuf->users))
+         {
+             break;
+         }
+@@ -738,7 +738,7 @@ OAL_STATIC oal_void  oal_mem_netbuf_release(oal_void)
+         }
+ 
+         /* 无论netbuf引用计数是多少，统一将其设置为1 */
+-        oal_atomic_set(&g_pst_netbuf_base_addr[ul_loop]->users, 1);
++        refcount_set(&g_pst_netbuf_base_addr[ul_loop]->users, 1);
+ 
+         oal_netbuf_free(g_pst_netbuf_base_addr[ul_loop]);
+ 
+@@ -773,7 +773,7 @@ OAL_STATIC oal_void  oal_mem_sdt_netbuf_release(oal_void)
+         }
+ 
+         /* 无论netbuf引用计数是多少，统一将其设置为1 */
+-        oal_atomic_set(&g_pst_sdt_netbuf_base_addr[ul_loop]->users, 1);
++        refcount_set(&g_pst_sdt_netbuf_base_addr[ul_loop]->users, 1);
+ 
+         oal_netbuf_free(g_pst_sdt_netbuf_base_addr[ul_loop]);
+ 
+@@ -2431,7 +2431,7 @@ OAL_STATIC oal_void  oal_mem_netbuf_leak(oal_void)
+             continue;
+         }
+ 
+-        if (1 == oal_atomic_read(&g_pst_netbuf_base_addr[us_loop]->users))
++        if (1 == refcount_read(&g_pst_netbuf_base_addr[us_loop]->users))
+         {
+             continue;
+         }
+@@ -2448,7 +2448,7 @@ OAL_STATIC oal_void  oal_mem_netbuf_leak(oal_void)
+         OAL_IO_PRINT("users: %d, "
+                      "alloc_file_id: %u, alloc_line_num: %u, alloc_time_stamp: %u, "
+                      "trace_file_id: %u, trace_line_num: %u, trace_time_stamp: %u.\n",
+-                      oal_atomic_read(&pst_netbuf->users),
++                      refcount_read(&pst_netbuf->users),
+                       pst_info->ul_alloc_file_id, pst_info->ul_alloc_line_num, pst_info->ul_alloc_time_stamp,
+                       pst_info->ul_trace_file_id, pst_info->ul_trace_line_num, pst_info->ul_trace_time_stamp);
+     }
+diff --git a/hisi/platform/oal/oal_sdio_host.c b/hisi/platform/oal/oal_sdio_host.c
+index 7be3214..51a82b1 100755
+--- a/hisi/platform/oal/oal_sdio_host.c
++++ b/hisi/platform/oal/oal_sdio_host.c
+@@ -1776,7 +1776,7 @@ oal_void oal_sdio_wakelocks_release_detect(struct oal_sdio *pst_hi_sdio)
+     {
+ #ifdef CONFIG_WAKELOCK
+         OAL_IO_PRINT("[E]We still hold %s   %lu wake locks, Now release all",
+-                    pst_hi_sdio->st_sdio_wakelock.st_wakelock.ws.name,
++                    pst_hi_sdio->st_sdio_wakelock.st_wakelock.ws->name,
+                     pst_hi_sdio->st_sdio_wakelock.lock_count);
+ #endif
+         DECLARE_DFT_TRACE_KEY_INFO("wlan_wakelock_error_hold", OAL_DFT_TRACE_EXCEP);
+diff --git a/hisi/platform/oam/oam_event.c b/hisi/platform/oam/oam_event.c
+index 77305d4..9cc7e6b 100755
+--- a/hisi/platform/oam/oam_event.c
++++ b/hisi/platform/oam/oam_event.c
+@@ -1283,7 +1283,7 @@ oal_uint32  oam_event_init(oal_void)
+     修改内容   : 新生成函数
+ 
+ *****************************************************************************/
+-OAL_STATIC oal_uint32  oam_ota_report_to_std(oal_uint8     *puc_param_one_addr,
++oal_uint32  oam_ota_report_to_std(oal_uint8     *puc_param_one_addr,
+                                        oal_uint16      us_param_one_len,
+                                        oal_uint8      *puc_param_two_addr,
+                                        oal_uint16      us_param_two_len,
+diff --git a/hisi/platform/pm/plat_efuse.c b/hisi/platform/pm/plat_efuse.c
+index 5608c71..0b095cf 100755
+--- a/hisi/platform/pm/plat_efuse.c
++++ b/hisi/platform/pm/plat_efuse.c
+@@ -270,7 +270,7 @@ static int32 store_efuse_into_file(uint32* buff)
+     pos = 0;
+     for (index = 0; index < EFUSE_REG_NUM; index++)
+     {
+-        ret = vfs_write(fp, (uint8 *)(&buff[index]), sizeof(uint16), &pos);
++        ret = kernel_write(fp, (uint8 *)(&buff[index]), sizeof(uint16), &pos);
+         if (ret < 0)
+         {
+             PS_PRINT_ERR("write %s fail, ret = %d\n", EFUSE_FILE_PATH, (int32)ret);
+diff --git a/hisi/platform/pm/plat_firmware.c b/hisi/platform/pm/plat_firmware.c
+index 776e441..c220e40 100755
+--- a/hisi/platform/pm/plat_firmware.c
++++ b/hisi/platform/pm/plat_firmware.c
+@@ -620,7 +620,7 @@ int32 recv_device_mem(OS_KERNEL_FILE_STRU *fp, uint8 *pucDataBuf, int32 len)
+ 
+     if (len <= lenbuf)
+     {
+-        vfs_write(fp, pucDataBuf, len, &fp->f_pos);
++        kernel_write(fp, pucDataBuf, len, &fp->f_pos);
+     }
+     vfs_fsync(fp, 0);
+     set_fs(fs);
+@@ -1536,7 +1536,7 @@ int32 exec_file_type_cmd(uint8 *Key, uint8 *Value)
+     {
+         for (i = 0; i < send_count; i++)
+         {
+-            rdlen = kernel_read(fp, fp->f_pos, g_pucDataBuf, per_send_len);
++            rdlen = p9_kernel_read_at(fp, fp->f_pos, g_pucDataBuf, per_send_len);
+             if (rdlen > 0)
+             {
+                 PS_PRINT_DBG("len of kernel_read is [%d], i=%d\n", rdlen, i);
+@@ -1775,7 +1775,7 @@ int32 firmware_read_cfg(uint8 *puc_CfgPatch, uint8 *puc_read_buffer)
+     }
+ 
+     OS_MEM_SET(puc_read_buffer, 0, READ_CFG_BUF_LEN);
+-    l_ret = kernel_read(fp, fp->f_pos, puc_read_buffer, READ_CFG_BUF_LEN);
++    l_ret = p9_kernel_read_at(fp, fp->f_pos, puc_read_buffer, READ_CFG_BUF_LEN);
+ 
+     filp_close(fp, NULL);
+     fp = NULL;
+diff --git a/hisi/platform/pm/plat_pm.c b/hisi/platform/pm/plat_pm.c
+index 74d26b9..9593627 100755
+--- a/hisi/platform/pm/plat_pm.c
++++ b/hisi/platform/pm/plat_pm.c
+@@ -375,7 +375,7 @@ void host_wkup_dev_work(struct work_struct *work)
+      */
+     if (BFGX_ACTIVE == bfgx_state_get())
+     {
+-        if (waitqueue_active(&pm_data->host_wkup_dev_comp.wait))
++        if (swait_active(&pm_data->host_wkup_dev_comp.wait))
+         {
+             PS_PRINT_INFO("it seems like dev ack with NoSleep\n");
+             complete_all(&pm_data->host_wkup_dev_comp);
+@@ -501,7 +501,7 @@ void host_send_disallow_msg(struct work_struct *work)
+     if ((ps_core_d->tty) && (ps_core_d->tty->port))
+     {
+         PS_PRINT_INFO("tty port flag 0x%x\n", (unsigned int)ps_core_d->tty->port->flags);
+-        while(test_bit(ASYNCB_SUSPENDED, (volatile unsigned long*)&(ps_core_d->tty->port->flags)))
++        while(tty_port_suspended(ps_core_d->tty->port))
+         {
+             if(loop_tty_resume_cnt++ >= MAX_TTYRESUME_LOOPCNT)
+             {
+@@ -1503,6 +1503,11 @@ STATIC int low_power_remove(void)
+     return ret;
+ }
+ 
++STATIC void devack_timer_expire(uint64 data);
++static void p9_devack_timer_cb(struct timer_list *t)
++{ devack_timer_expire((uint64)container_of(t, struct pm_drv_data, dev_ack_timer)); }
++static void p9_bfg_timer_cb(struct timer_list *t)
++{ bfg_timer_expire((uint64)container_of(t, struct pm_drv_data, bfg_timer)); }
+ STATIC void devack_timer_expire(uint64 data)
+ {
+     uint64 flags;
+@@ -1618,14 +1623,10 @@ STATIC int low_power_probe(void)
+     spin_lock_init(&pm_data->wakelock_protect_spinlock);
+ 
+     /* init timer */
+-    init_timer(&pm_data->dev_ack_timer);
+-    pm_data->dev_ack_timer.function = devack_timer_expire;
+-    pm_data->dev_ack_timer.data     = (unsigned long)pm_data;
++    timer_setup(&pm_data->dev_ack_timer, p9_devack_timer_cb, 0);
+ 
+     /* init bfg data timer */
+-    init_timer(&pm_data->bfg_timer);
+-    pm_data->bfg_timer.function = bfg_timer_expire;
+-    pm_data->bfg_timer.data     = (unsigned long)pm_data;
++    timer_setup(&pm_data->bfg_timer, p9_bfg_timer_cb, 0);
+ 
+     /* init completion */
+     init_completion(&pm_data->host_wkup_dev_comp);
+diff --git a/hisi/platform/pm/plat_pm_wlan.c b/hisi/platform/pm/plat_pm_wlan.c
+index 6189975..582c47c 100755
+--- a/hisi/platform/pm/plat_pm_wlan.c
++++ b/hisi/platform/pm/plat_pm_wlan.c
+@@ -67,6 +67,8 @@ void wlan_pm_sleep_work(oal_work_stru *pst_worker);
+ void wlan_pm_freq_adjust_work(oal_work_stru *pst_worker);
+ 
+ void wlan_pm_wdg_timeout(struct wlan_pm_s *pm_data);
++static void p9_wlan_wdg_cb(struct timer_list *t)
++{ wlan_pm_wdg_timeout(container_of(t, struct wlan_pm_s, st_watchdog_timer)); }
+ 
+ int32 wlan_pm_wakeup_done_callback(void *data);
+ int32 wlan_pm_close_done_callback(void *data);
+@@ -306,9 +308,7 @@ struct wlan_pm_s*  wlan_pm_init(oal_void)
+     OAL_INIT_WORK(&pst_wlan_pm->st_ram_reg_test_work,  wlan_device_mem_check_work);
+ 
+     /*sleep timer初始化*/
+-    init_timer(&pst_wlan_pm->st_watchdog_timer);
+-    pst_wlan_pm->st_watchdog_timer.data        = (unsigned long)pst_wlan_pm;
+-    pst_wlan_pm->st_watchdog_timer.function    = (void *)wlan_pm_wdg_timeout;
++    timer_setup(&pst_wlan_pm->st_watchdog_timer, p9_wlan_wdg_cb, 0);
+     pst_wlan_pm->ul_wdg_timeout_cnt            = WLAN_SLEEP_DEFAULT_CHECK_CNT;
+     pst_wlan_pm->ul_wdg_timeout_curr_cnt       = 0;
+     pst_wlan_pm->ul_packet_cnt                 = 0;
+diff --git a/hisi/wifi/dmac/mac_resource.c b/hisi/wifi/dmac/mac_resource.c
+index 1b08799..9711d94 100755
+--- a/hisi/wifi/dmac/mac_resource.c
++++ b/hisi/wifi/dmac/mac_resource.c
+@@ -1100,7 +1100,6 @@ oal_module_symbol(mac_res_set_max_asoc_user);
+ oal_module_symbol(g_us_max_asoc_user);
+ oal_module_symbol(mac_res_free_dev);
+ oal_module_symbol(mac_res_alloc_hmac_dev);
+-oal_module_symbol(mac_res_get_dev);
+ oal_module_symbol(mac_res_free_mac_user);
+ oal_module_symbol(mac_res_free_mac_vap);
+ oal_module_symbol(mac_res_free_hash);
+diff --git a/hisi/wifi/dmac/mac_vap.c b/hisi/wifi/dmac/mac_vap.c
+index f8e40a8..dc1ed6b 100755
+--- a/hisi/wifi/dmac/mac_vap.c
++++ b/hisi/wifi/dmac/mac_vap.c
+@@ -3650,7 +3650,7 @@ oal_uint32 mac_vap_exit(mac_vap_stru *pst_vap)
+     修改内容   : 增加HT only和VHT only协议模式的初始化
+ 
+ *****************************************************************************/
+-OAL_STATIC oal_void  mac_init_mib(mac_vap_stru *pst_mac_vap)
++oal_void  mac_init_mib(mac_vap_stru *pst_mac_vap)
+ {
+     wlan_mib_ieee802dot11_stru *pst_mib_info;
+     oal_uint8 uc_idx;
+diff --git a/hisi/wifi/hmac/hmac_auto_adjust_freq.c b/hisi/wifi/hmac/hmac_auto_adjust_freq.c
+index 1c00477..9077fcf 100755
+--- a/hisi/wifi/hmac/hmac_auto_adjust_freq.c
++++ b/hisi/wifi/hmac/hmac_auto_adjust_freq.c
+@@ -603,7 +603,6 @@ oal_void hmac_wifi_auto_ddr_init(oal_void)
+         OAL_IO_PRINT("[AUTODDR]pm_qos_request alloc memory failed.\n");
+         return;
+     }
+-    g_pst_wifi_auto_ddr->pm_qos_class = 0;
+     pm_qos_add_request(g_pst_wifi_auto_ddr, PM_QOS_MEMORY_THROUGHPUT,
+                        PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+     return;
+diff --git a/hisi/wifi/wal/wal_linux_cfg80211.c b/hisi/wifi/wal/wal_linux_cfg80211.c
+index 5c7a767..d7c15c5 100755
+--- a/hisi/wifi/wal/wal_linux_cfg80211.c
++++ b/hisi/wifi/wal/wal_linux_cfg80211.c
+@@ -3749,9 +3749,9 @@ OAL_STATIC oal_int32 wal_cfg80211_set_channel_info(oal_wiphy_stru      *pst_wiph
+     pst_mac_vap = OAL_NET_DEV_PRIV(pst_netdev);
+     uc_vap_id   = pst_mac_vap->uc_vap_id;
+ 
+-    l_bandwidth    = pst_netdev->ieee80211_ptr->preset_chandef.width;
+-    l_center_freq1 = pst_netdev->ieee80211_ptr->preset_chandef.center_freq1;
+-    pst_channel    = pst_netdev->ieee80211_ptr->preset_chandef.chan;
++    l_bandwidth    = pst_netdev->ieee80211_ptr->u.ap.preset_chandef.width;
++    l_center_freq1 = pst_netdev->ieee80211_ptr->u.ap.preset_chandef.center_freq1;
++    pst_channel    = pst_netdev->ieee80211_ptr->u.ap.preset_chandef.chan;
+     l_channel      = pst_channel->hw_value;
+ 
+     OAM_WARNING_LOG3(uc_vap_id, OAM_SF_ANY, "{wal_cfg80211_set_channel::l_bandwidth = %d, l_center_freq1 = %d, l_channel = %d.}",
+@@ -5785,7 +5785,9 @@ OAL_STATIC oal_wireless_dev_stru * wal_cfg80211_add_virtual_intf(oal_wiphy_stru
+ 
+     /* 对netdevice进行赋值 */
+     /* 对新创建的net_device 初始化对应参数 */
++#if 0 /* p9: WEXT removed */
+     pst_net_dev->wireless_handlers             = &g_st_iw_handler_def;
++#endif
+     /* OAL_NETDEVICE_OPS(pst_net_dev)             = &g_st_wal_net_dev_ops; */
+     pst_net_dev->netdev_ops                    = &g_st_wal_net_dev_ops;
+ 
+@@ -7623,6 +7625,49 @@ OAL_STATIC oal_void wal_cfg80211_abort_scan(oal_wiphy_stru         *pst_wiphy,
+ 
+ /* 不同操作系统函数指针结构体方式不同*/
+ #if (_PRE_OS_VERSION_LINUX == _PRE_OS_VERSION)
++
++/* p9: cfg80211_ops adapters for 7.3.1 (wdev instead of netdev, link ids, cookies by value). */
++static int p9_add_key(struct wiphy *w, struct wireless_dev *wd, int link, u8 idx, bool pw, const u8 *mac, struct key_params *kp)
++{ return wal_cfg80211_add_key(w, wd->netdev, idx, pw, mac, kp); }
++static int p9_get_key(struct wiphy *w, struct wireless_dev *wd, int link, u8 idx, bool pw, const u8 *mac, void *ck, void (*cb)(void *, struct key_params *))
++{ return wal_cfg80211_get_key(w, wd->netdev, idx, pw, mac, ck, cb); }
++static int p9_del_key(struct wiphy *w, struct wireless_dev *wd, int link, u8 idx, bool pw, const u8 *mac)
++{ return wal_cfg80211_remove_key(w, wd->netdev, idx, pw, mac); }
++static int p9_set_default_key(struct wiphy *w, struct net_device *nd, int link, u8 idx, bool uc, bool mc)
++{ return wal_cfg80211_set_default_key(w, nd, idx, uc, mc); }
++static int p9_set_default_mgmt_key(struct wiphy *w, struct wireless_dev *wd, int link, u8 idx)
++{ return wal_cfg80211_set_default_mgmt_key(w, wd->netdev, idx); }
++static int p9_set_wiphy_params(struct wiphy *w, int radio, u32 changed)
++{ return wal_cfg80211_set_wiphy_params(w, changed); }
++static int p9_change_beacon(struct wiphy *w, struct net_device *nd, struct cfg80211_ap_update *u)
++{ return wal_cfg80211_change_beacon(w, nd, &u->beacon); }
++static int p9_stop_ap(struct wiphy *w, struct net_device *nd, unsigned int link)
++{ return wal_cfg80211_stop_ap(w, nd); }
++static int p9_sched_scan_stop(struct wiphy *w, struct net_device *nd, u64 reqid)
++{ return wal_cfg80211_sched_scan_stop(w, nd); }
++static int p9_change_virtual_intf(struct wiphy *w, struct net_device *nd, enum nl80211_iftype t, struct vif_params *vp)
++{ return wal_cfg80211_change_virtual_intf(w, nd, t, &vp->flags, vp); }
++static int p9_add_station(struct wiphy *w, struct wireless_dev *wd, const u8 *mac, struct station_parameters *sp)
++{ return wal_cfg80211_add_station(w, wd->netdev, mac, sp); }
++static int p9_del_station(struct wiphy *w, struct wireless_dev *wd, struct station_del_parameters *dp)
++{ return wal_cfg80211_del_station(w, wd->netdev, dp); }
++static int p9_change_station(struct wiphy *w, struct wireless_dev *wd, const u8 *mac, struct station_parameters *sp)
++{ return wal_cfg80211_change_station(w, wd->netdev, mac, sp); }
++static int p9_get_station(struct wiphy *w, struct wireless_dev *wd, const u8 *mac, struct station_info *si)
++{ return wal_cfg80211_get_station(w, wd->netdev, mac, si); }
++static int p9_dump_station(struct wiphy *w, struct wireless_dev *wd, int i, u8 *mac, struct station_info *si)
++{ return wal_cfg80211_dump_station(w, wd->netdev, i, mac, si); }
++/* ponytail: cfg80211 now owns ROC/mgmt_tx cookies; the driver's own cookie is discarded.
++ * Fine for STA (driver SME via .connect); P2P events would carry the wrong cookie. */
++static int p9_remain_on_channel(struct wiphy *w, struct wireless_dev *wd, struct ieee80211_channel *ch, unsigned int dur, u64 cookie, const u8 *rx)
++{ u64 c = cookie; return wal_cfg80211_remain_on_channel(w, wd, ch, dur, &c); }
++static int p9_mgmt_tx(struct wiphy *w, struct wireless_dev *wd, struct cfg80211_mgmt_tx_params *mp, u64 cookie)
++{ u64 c = cookie; return wal_cfg80211_mgmt_tx(w, wd, mp, &c); }
++static int p9_set_bitrate_mask(struct wiphy *w, struct net_device *nd, unsigned int link, const u8 *peer, const struct cfg80211_bitrate_mask *m)
++{ return wal_cfg80211_set_bitrate_mask(w, nd, peer, m); }
++static struct wireless_dev *p9_add_virtual_intf(struct wiphy *w, const char *name, unsigned char nat, enum nl80211_iftype t, struct vif_params *vp)
++{ return wal_cfg80211_add_virtual_intf(w, name, nat, t, &vp->flags, vp); }
++
+ OAL_STATIC oal_cfg80211_ops_stru  g_wal_cfg80211_ops =
+ {
+     .scan                     = wal_cfg80211_scan,
+@@ -7630,12 +7675,12 @@ OAL_STATIC oal_cfg80211_ops_stru  g_wal_cfg80211_ops =
+     .connect                  = wal_cfg80211_connect,
+     .disconnect               = wal_cfg80211_disconnect,
+ #endif
+-    .add_key                  = wal_cfg80211_add_key,
+-    .get_key                  = wal_cfg80211_get_key,
+-    .del_key                  = wal_cfg80211_remove_key,
+-    .set_default_key          = wal_cfg80211_set_default_key,
++    .add_key                  = p9_add_key,
++    .get_key                  = p9_get_key,
++    .del_key                  = p9_del_key,
++    .set_default_key          = p9_set_default_key,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,44)//TBD:确认正确的 Linux 版本号
+-    .set_default_mgmt_key     = wal_cfg80211_set_default_mgmt_key,
++    .set_default_mgmt_key     = p9_set_default_mgmt_key,
+ #else
+     .set_default_mgmt_key     = wal_cfg80211_set_default_key,
+ #endif
+@@ -7643,25 +7688,25 @@ OAL_STATIC oal_cfg80211_ops_stru  g_wal_cfg80211_ops =
+     .set_channel              = wal_cfg80211_set_channel,
+ #endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)
+-    .set_wiphy_params         = wal_cfg80211_set_wiphy_params,
++    .set_wiphy_params         = p9_set_wiphy_params,
+ #endif
+ #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,34)) /* l00311403于1/25将< KERNEL_VERSION(3, 4, 0)改成了<= KERNEL_VERSION(2,6,34)*/
+     .add_beacon               = wal_cfg80211_add_beacon,
+     .set_beacon               = wal_cfg80211_set_beacon,/*zwx287476于2015/6/24修改了此接口*/
+ #else/* Hi1102 修改AP 配置接口 */
+-    .change_beacon            = wal_cfg80211_change_beacon,
++    .change_beacon            = p9_change_beacon,
+     .start_ap                 = wal_cfg80211_start_ap,
+-    .stop_ap                  = wal_cfg80211_stop_ap,
++    .stop_ap                  = p9_stop_ap,
+     .change_bss               = wal_cfg80211_change_bss,
+     .sched_scan_start         = wal_cfg80211_sched_scan_start,
+-    .sched_scan_stop          = wal_cfg80211_sched_scan_stop,
++    .sched_scan_stop          = p9_sched_scan_stop,
+ #endif
+-    .change_virtual_intf      = wal_cfg80211_change_virtual_intf,
+-    .add_station              = wal_cfg80211_add_station,
+-    .del_station              = wal_cfg80211_del_station,
+-    .change_station           = wal_cfg80211_change_station,
+-    .get_station              = wal_cfg80211_get_station,
+-    .dump_station             = wal_cfg80211_dump_station,
++    .change_virtual_intf      = p9_change_virtual_intf,
++    .add_station              = p9_add_station,
++    .del_station              = p9_del_station,
++    .change_station           = p9_change_station,
++    .get_station              = p9_get_station,
++    .dump_station             = p9_dump_station,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)
+     .dump_survey              = wal_cfg80211_dump_survey,
+ #endif
+@@ -7670,14 +7715,13 @@ OAL_STATIC oal_cfg80211_ops_stru  g_wal_cfg80211_ops =
+     .set_pmksa                = wal_cfg80211_set_pmksa,
+     .del_pmksa                = wal_cfg80211_del_pmksa,
+     .flush_pmksa              = wal_cfg80211_flush_pmksa,
+-    .remain_on_channel        = wal_cfg80211_remain_on_channel,
++    .remain_on_channel        = p9_remain_on_channel,
+     .cancel_remain_on_channel = wal_cfg80211_cancel_remain_on_channel,
+-    .mgmt_tx                  = wal_cfg80211_mgmt_tx,
+-    .mgmt_frame_register      = wal_cfg80211_mgmt_frame_register,
+-    .set_bitrate_mask         = wal_cfg80211_set_bitrate_mask,
++    .mgmt_tx                  = p9_mgmt_tx,
++    .set_bitrate_mask         = p9_set_bitrate_mask,
+ #endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 44))//TBD:1102 需要，暂时用内核版本号区分
+-    .add_virtual_intf         = wal_cfg80211_add_virtual_intf,
++    .add_virtual_intf         = p9_add_virtual_intf,
+     .del_virtual_intf         = wal_cfg80211_del_virtual_intf,
+ #endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,44))
+@@ -7879,7 +7923,7 @@ oal_uint32  wal_cfg80211_init(oal_void)
+             pst_wiphy->max_sched_scan_ssids  = MAX_PNO_SSID_COUNT;
+ 	        pst_wiphy->max_match_sets        = MAX_PNO_SSID_COUNT;
+ 	        pst_wiphy->max_sched_scan_ie_len = WAL_MAX_SCAN_IE_LEN;
+-            pst_wiphy->flags |= WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
++            pst_wiphy->max_sched_scan_reqs = 1;
+ #endif   /* _PRE_PRODUCT_ID == _PRE_PRODUCT_ID_HI1102_HOST */
+ 
+ #else    /* 非p2p场景下起多vap */
+diff --git a/hisi/wifi/wal/wal_linux_cfgvendor.c b/hisi/wifi/wal/wal_linux_cfgvendor.c
+index 81ad383..2e240e0 100755
+--- a/hisi/wifi/wal/wal_linux_cfgvendor.c
++++ b/hisi/wifi/wal/wal_linux_cfgvendor.c
+@@ -786,6 +786,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = GSCAN_SUBCMD_GET_CHANNEL_LIST
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_get_channel_list
+     },
+ 
+@@ -795,6 +796,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = ANDR_WIFI_SET_COUNTRY
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_set_country
+     },
+     {
+@@ -803,6 +805,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = ANDR_WIFI_SUBCMD_GET_FEATURE_SET
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_get_feature_set
+     },
+     {
+@@ -811,6 +814,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = ANDR_WIFI_RANDOM_MAC_OUI
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_set_random_mac_oui
+     },
+     {
+@@ -819,6 +823,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_GET_FEATURE
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_get_feature
+     },
+     {
+@@ -827,6 +832,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_GET_VER
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_get_version
+     },
+     {
+@@ -835,6 +841,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_GET_RING_STATUS
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_get_ring_status
+     },
+     {
+@@ -843,6 +850,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_TRIGGER_MEM_DUMP
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_trigger_mem_dump
+     },
+     {
+@@ -851,6 +859,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_START_LOGGING
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_start_logging
+     },
+     {
+@@ -859,6 +868,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = DEBUG_GET_RING_DATA
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_dbg_get_ring_data
+     },
+     {
+@@ -867,6 +877,7 @@ OAL_STATIC OAL_CONST oal_wiphy_vendor_command_stru wal_vendor_cmds[] =
+             .subcmd = LSTATS_SUBCMD_GET_INFO
+         },
+         .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
++        .policy = VENDOR_CMD_RAW_DATA,
+         .doit = wal_cfgvendor_lstats_get_info
+     }
+ };
+diff --git a/hisi/wifi/wal/wal_linux_flowctl.c b/hisi/wifi/wal/wal_linux_flowctl.c
+index 5c8b255..acdb4fd 100755
+--- a/hisi/wifi/wal/wal_linux_flowctl.c
++++ b/hisi/wifi/wal/wal_linux_flowctl.c
+@@ -256,7 +256,7 @@ oal_uint32 wal_flowctl_backp_event_handler(frw_event_mem_stru *pst_event_mem)
+ #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
+ oal_uint16  wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf)
+ #else
+-oal_uint16  wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf, void *accel_priv, select_queue_fallback_t fallback)
++oal_uint16  wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf, struct net_device *sb_dev)
+ #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)) */
+ {
+     return oal_netbuf_select_queue(pst_buf);
+diff --git a/hisi/wifi/wal/wal_linux_flowctl.h b/hisi/wifi/wal/wal_linux_flowctl.h
+index 07a0e4c..87ff0d7 100755
+--- a/hisi/wifi/wal/wal_linux_flowctl.h
++++ b/hisi/wifi/wal/wal_linux_flowctl.h
+@@ -94,7 +94,7 @@ extern oal_uint32   wal_flowctl_backp_event_handler(frw_event_mem_stru *pst_even
+ #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
+ extern oal_uint16   wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf);
+ #else
+-extern oal_uint16   wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf, void *accel_priv, select_queue_fallback_t fallback);
++extern oal_uint16   wal_netdev_select_queue(oal_net_device_stru *pst_dev, oal_netbuf_stru *pst_buf, struct net_device *sb_dev);
+ #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)) */
+ 
+ #endif /* end if for _PRE_WLAN_FEATURE_OFFLOAD_FLOWCTL */
+diff --git a/hisi/wifi/wal/wal_linux_ioctl.c b/hisi/wifi/wal/wal_linux_ioctl.c
+index 7cc7b80..40e8f31 100755
+--- a/hisi/wifi/wal/wal_linux_ioctl.c
++++ b/hisi/wifi/wal/wal_linux_ioctl.c
+@@ -7153,6 +7153,23 @@ OAL_STATIC oal_void  wal_regdomain_fill_info(OAL_CONST oal_ieee80211_regdomain_s
+     修改内容   : 新生成函数
+ 
+ *****************************************************************************/
++/* p9: wiphy_apply_custom_regulatory() takes rtnl since 6.x, callers here already hold it */
++static struct wiphy *p9_reg_wiphy;
++static const struct ieee80211_regdomain *p9_reg_rd;
++static void p9_regdom_apply_fn(struct work_struct *w)
++{
++    wal_cfg80211_reset_bands();
++    wiphy_apply_custom_regulatory(p9_reg_wiphy, p9_reg_rd);
++    wal_cfg80211_save_bands();
++}
++static DECLARE_WORK(p9_reg_work, p9_regdom_apply_fn);
++static void p9_regdom_apply_async(struct wiphy *wiphy, const struct ieee80211_regdomain *rd)
++{
++    p9_reg_wiphy = wiphy;
++    p9_reg_rd = rd;
++    schedule_work(&p9_reg_work);    /* ponytail: not flushed on module unload; unload is unsupported anyway */
++}
++
+ oal_int32  wal_regdomain_update(oal_net_device_stru *pst_net_dev, oal_int8 *pc_country)
+ {
+ #ifndef _PRE_SUPPORT_ACS
+@@ -7280,12 +7297,7 @@ oal_int32  wal_regdomain_update(oal_net_device_stru *pst_net_dev, oal_int8 *pc_c
+ #endif
+         OAM_WARNING_LOG2(0, OAM_SF_ANY, "{wal_regdomain_update::update regdom to kernel.%c,%c}\r\n",
+             pc_country[0], pc_country[1]);
+-        wal_cfg80211_reset_bands();
+-        oal_wiphy_apply_custom_regulatory(pst_device->pst_wiphy, pst_regdom);
+-        /* DTS2016120211174:更新管制域后，将每个信道flag 信息保存到对应orig_flag，
+-         * 避免去关联时恢复管制域信息错误，导致某些信道不能工作。
+-         */
+-        wal_cfg80211_save_bands();
++        p9_regdom_apply_async(pst_device->pst_wiphy, pst_regdom);
+     }
+ #endif
+ 
+@@ -8754,7 +8766,9 @@ OAL_STATIC oal_uint32  wal_hipriv_add_vap(oal_net_device_stru *pst_cfg_net_dev,
+     oal_memset(pst_wdev, 0, OAL_SIZEOF(oal_wireless_dev_stru));
+ 
+     /* 对netdevice进行赋值 */
++#if 0 /* p9: WEXT removed */
+     pst_net_dev->wireless_handlers             = &g_st_iw_handler_def;
++#endif
+     /* OAL_NETDEVICE_OPS(pst_net_dev)             = &g_st_wal_net_dev_ops; */
+     pst_net_dev->netdev_ops                    = &g_st_wal_net_dev_ops;
+ 
+@@ -11601,11 +11615,11 @@ oal_int32  wal_hipriv_wait_rsp(oal_net_device_stru *pst_net_dev, oal_int8 *pc_pa
+ 
+ *****************************************************************************/
+ #ifdef CONFIG_MODULES
+-OAL_STATIC oal_int32  wal_hipriv_proc_write(oal_file_stru *pst_file, oal_int8 *pc_buffer, oal_uint32 ul_len, oal_void *p_data)
++oal_int32  wal_hipriv_proc_write(oal_file_stru *pst_file, oal_int8 *pc_buffer, oal_uint32 ul_len, oal_void *p_data)
+ #endif
+ #else
+ #ifdef CONFIG_MODULES
+-OAL_STATIC oal_int32  wal_hipriv_proc_write(oal_file_stru *pst_file, const oal_int8 *pc_buffer, oal_uint32 ul_len, oal_void *p_data)
++oal_int32  wal_hipriv_proc_write(oal_file_stru *pst_file, const oal_int8 *pc_buffer, oal_uint32 ul_len, oal_void *p_data)
+ #endif
+ #endif
+ #ifdef CONFIG_MODULES
+@@ -15468,7 +15482,9 @@ oal_int32 wal_init_wlan_netdev(oal_wiphy_stru *pst_wiphy, char *dev_name)
+     oal_memset(pst_wdev, 0, OAL_SIZEOF(oal_wireless_dev_stru));
+ 
+     /* 对netdevice进行赋值 */
++#if 0 /* p9: WEXT removed */
+     pst_net_dev->wireless_handlers             = &g_st_iw_handler_def;
++#endif
+     pst_net_dev->netdev_ops                    = &g_st_wal_net_dev_ops;
+ 
+ #if (_PRE_MULTI_CORE_MODE_OFFLOAD_DMAC == _PRE_MULTI_CORE_MODE) && (_PRE_OS_VERSION_LINUX == _PRE_OS_VERSION)
+diff --git a/hisi/wifi/wal/wal_linux_scan.c b/hisi/wifi/wal/wal_linux_scan.c
+index a40cc4e..3395a00 100755
+--- a/hisi/wifi/wal/wal_linux_scan.c
++++ b/hisi/wifi/wal/wal_linux_scan.c
+@@ -90,7 +90,7 @@ OAL_STATIC oal_void  wal_inform_bss_frame(wal_scanned_bss_info_stru *pst_scanned
+ 
+ #if (_PRE_OS_VERSION_LINUX == _PRE_OS_VERSION)
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39))
+-    struct timespec ts;
++    struct timespec64 ts;
+ #else
+     struct timeval tv;
+ #endif

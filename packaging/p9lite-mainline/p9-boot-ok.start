@@ -1,0 +1,9 @@
+#!/bin/sh
+# Mainline kernels only: tell p9test the boot completed (local runs last in the default runlevel).
+# Until this runs, every reset goes to fastboot and the kernel restarts to fastboot after its boot deadline;
+# afterwards p9test writes Huawei boot keypoint 250 so the bootloader never counts this boot as failed.
+P=/sys/module/p9test/parameters/boot_ok
+[ -w $P ] || exit 0
+pidof dockerd >/dev/null || { logger -t p9-boot-ok "dockerd not running, boot_ok withheld"; exit 0; }
+echo 1 > $P && logger -t p9-boot-ok "boot_ok set"
+exit 0

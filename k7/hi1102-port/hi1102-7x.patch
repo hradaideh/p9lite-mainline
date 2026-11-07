@@ -1,0 +1,405 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..78f7602
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,12 @@
++*.o
++*.ko
++*.mod
++*.mod.c
++*.mod.o
++*.cmd
++.*.cmd
++modules.order
++Module.symvers
++*.a
++.tmp_versions/
++*.d
+diff --git a/hisi/platform/Makefile b/hisi/platform/Makefile
+index 130a925..5ac4cdc 100755
+--- a/hisi/platform/Makefile
++++ b/hisi/platform/Makefile
+@@ -171,12 +171,12 @@ $(warning HI110X_VER_COMMIT_TIME: $(HI110X_VER_COMMIT_TIME))
+ $(warning HI110X_VERSION: $(HI110X_VERSION))
+ #$(warning INCLUDE: $(HI1102_INCLUDES))
+ 
+-EXTRA_CFLAGS = $(HI1102_INCLUDES)
+-EXTRA_CFLAGS += $(COPTS) $(KBUILD_CFLAGS)
+-EXTRA_CFLAGS += $(COMM_COPTS)
+-EXTRA_CFLAGS += -Werror -Wuninitialized -Wempty-body -Wclobbered -Wmissing-parameter-type -Wold-style-declaration -Woverride-init -Wtype-limits
++ccflags-y = $(HI1102_INCLUDES)
++ccflags-y += $(COPTS) $(KBUILD_CFLAGS)
++ccflags-y += $(COMM_COPTS)
++ccflags-y += -Wuninitialized -Wempty-body -Wclobbered -Wmissing-parameter-type -Wold-style-declaration -Woverride-init -Wtype-limits
+ 
+-EXTRA_CFLAGS +=  -fno-pic
++ccflags-y +=  -fno-pic
+ MODFLAGS = -fno-pic
+ else
+ 
+diff --git a/hisi/platform/inc/oal/linux/arch/oal_kernel_file.h b/hisi/platform/inc/oal/linux/arch/oal_kernel_file.h
+index f474119..5f72987 100755
+--- a/hisi/platform/inc/oal/linux/arch/oal_kernel_file.h
++++ b/hisi/platform/inc/oal/linux/arch/oal_kernel_file.h
+@@ -58,7 +58,8 @@ extern "C" {
+ #define OAL_PRINT_FORMAT_LENGTH     512                     /* 打印格式字符串的最大长度 */
+ 
+ typedef struct file             oal_file;
+-typedef mm_segment_t            oal_mm_segment_t;
++/* set_fs()/get_fs() are gone (5.10 arm64); kernel_read/kernel_write need no segment switch */
++typedef int                     oal_mm_segment_t;
+ 
+ 
+ /*****************************************************************************
+@@ -102,12 +103,12 @@ typedef mm_segment_t            oal_mm_segment_t;
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_mm_segment_t oal_get_fs(oal_void)
+ {
+-    return  get_fs();
++    return 0;
+ }
+ 
+ OAL_STATIC OAL_INLINE oal_void oal_set_fs(oal_mm_segment_t fs)
+ {
+-    return set_fs(fs);
++    (void)fs;
+ }
+ 
+ OAL_STATIC OAL_INLINE oal_int oal_kernel_file_close(oal_file *pst_file)
+diff --git a/hisi/platform/inc/oal/linux/arch/oal_net.h b/hisi/platform/inc/oal/linux/arch/oal_net.h
+index 041df55..c7591bb 100755
+--- a/hisi/platform/inc/oal/linux/arch/oal_net.h
++++ b/hisi/platform/inc/oal/linux/arch/oal_net.h
+@@ -188,7 +188,8 @@ typedef iw_handler                                  oal_iw_handler;
+ #define OAL_NETDEVICE_OPS_DO_IOCTL(_pst_netdev_ops)         ((_pst_netdev_ops)->ndo_do_ioctl)
+ #define OAL_NETDEVICE_OPS_CHANGE_MTU(_pst_netdev_ops)       ((_pst_netdev_ops)->ndo_change_mtu)
+ 
+-#define OAL_NETDEVICE_LAST_RX(_pst_dev)                     ((_pst_dev)->last_rx)
++/* net_device.last_rx removed in 4.11 */
++#define OAL_NETDEVICE_LAST_RX(_pst_dev)                     (*({ static unsigned long __p9_last_rx; &__p9_last_rx; }))
+ #define OAL_NETDEVICE_WIRELESS_HANDLERS(_pst_dev)           ((_pst_dev)->wireless_handlers)
+ #define OAL_NETDEVICE_RTNL_LINK_OPS(_pst_dev)               ((_pst_dev)->rtnl_link_ops)
+ #define OAL_NETDEVICE_RTNL_LINK_STATE(_pst_dev)             ((_pst_dev)->rtnl_link_state)
+@@ -196,7 +197,8 @@ typedef iw_handler                                  oal_iw_handler;
+ #define OAL_NETDEVICE_TX_QUEUE_LEN(_pst_dev)                ((_pst_dev)->tx_queue_len)
+ #define OAL_NETDEVICE_TX_QUEUE_NUM(_pst_dev)                ((_pst_dev)->num_tx_queues)
+ #define OAL_NETDEVICE_TX_QUEUE(_pst_dev, _index)            ((_pst_dev)->_tx[_index])
+-#define OAL_NETDEVICE_DESTRUCTOR(_pst_dev)                  ((_pst_dev)->destructor)
++/* net_device.destructor became priv_destructor + needs_free_netdev in 4.12 */
++#define OAL_NETDEVICE_DESTRUCTOR(_pst_dev)                  ((_pst_dev)->priv_destructor)
+ #define OAL_NETDEVICE_TYPE(_pst_dev)                        ((_pst_dev)->type)
+ #define OAL_NETDEVICE_NAME(_pst_dev)                        ((_pst_dev)->name)
+ #define OAL_NETDEVICE_MASTER(_pst_dev)                      ((_pst_dev)->master)
+@@ -710,7 +712,7 @@ OAL_STATIC OAL_INLINE oal_uint8* oal_netbuf_pull(oal_netbuf_stru *pst_netbuf, oa
+     修改内容   : 新生成函数
+ 
+ *****************************************************************************/
+-OAL_STATIC OAL_INLINE oal_int32 oal_ieee80211_channel_to_frequency(oal_int32 l_channel, enum ieee80211_band band)
++OAL_STATIC OAL_INLINE oal_int32 oal_ieee80211_channel_to_frequency(oal_int32 l_channel, enum nl80211_band band)
+ {
+     /* see 802.11 17.3.8.3.2 and Annex J
+         * there are overlapping channel numbers in 5GHz and 2GHz bands */
+@@ -721,7 +723,7 @@ OAL_STATIC OAL_INLINE oal_int32 oal_ieee80211_channel_to_frequency(oal_int32 l_c
+ 
+     switch (band)
+     {
+-        case IEEE80211_BAND_2GHZ:
++        case NL80211_BAND_2GHZ:
+         {
+             if (14 == l_channel)
+             {
+@@ -734,7 +736,7 @@ OAL_STATIC OAL_INLINE oal_int32 oal_ieee80211_channel_to_frequency(oal_int32 l_c
+             break;
+         }
+ 
+-        case IEEE80211_BAND_5GHZ:
++        case NL80211_BAND_5GHZ:
+         {
+             if (l_channel >= 182 && l_channel <= 196)
+             {
+@@ -2657,7 +2659,7 @@ OAL_STATIC OAL_INLINE oal_uint32  oal_netbuf_decrease_user(oal_netbuf_stru *pst_
+         return OAL_ERR_CODE_PTR_NULL;
+     }
+ 
+-    oal_atomic_dec(&(pst_buf->users));
++    refcount_dec(&(pst_buf->users));
+ 
+     return OAL_SUCC;
+ }
+@@ -2684,7 +2686,7 @@ OAL_STATIC OAL_INLINE oal_uint32  oal_netbuf_increase_user(oal_netbuf_stru *pst_
+         return OAL_ERR_CODE_PTR_NULL;
+     }
+ 
+-    oal_atomic_inc(&(pst_buf->users));
++    refcount_inc(&(pst_buf->users));
+ 
+     return OAL_SUCC;
+ }
+@@ -2777,7 +2779,7 @@ OAL_STATIC OAL_INLINE oal_int32  oal_netif_rx_hw(oal_netbuf_stru *pst_netbuf)
+ {
+     if (!in_interrupt())
+     {
+-        return netif_rx_ni(pst_netbuf);
++        return netif_rx(pst_netbuf);
+     }
+     else
+     {
+@@ -2824,7 +2826,7 @@ OAL_STATIC OAL_INLINE oal_int32  oal_netif_rx(oal_netbuf_stru *pst_netbuf)
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_int32  oal_netif_rx_ni(oal_netbuf_stru *pst_netbuf)
+ {
+-    return netif_rx_ni(pst_netbuf);
++    return netif_rx(pst_netbuf);
+ }
+ 
+ 
+@@ -2855,7 +2857,7 @@ OAL_STATIC OAL_INLINE oal_void  oal_local_bh_enable(oal_void)
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_uint64  oal_cpu_clock(oal_void)
+ {
+-    return cpu_clock(UINT_MAX);
++    return local_clock();
+ }
+ 
+ OAL_STATIC OAL_INLINE oal_int32 oal_netbuf_expand_head(oal_netbuf_stru *netbuf,
+@@ -2892,7 +2894,6 @@ OAL_STATIC OAL_INLINE oal_sock_stru* oal_netlink_kernel_create(
+     oal_memset(&cfg, 0, OAL_SIZEOF(cfg));
+     cfg.groups = 0;
+     cfg.input = input;
+-    cfg.cb_mutex = NULL;
+ 
+     return netlink_kernel_create(pst_net, l_unit, &cfg);
+ #else
+diff --git a/hisi/platform/inc/oal/linux/arch/oal_schedule.h b/hisi/platform/inc/oal/linux/arch/oal_schedule.h
+index 709d20f..b34a605 100755
+--- a/hisi/platform/inc/oal/linux/arch/oal_schedule.h
++++ b/hisi/platform/inc/oal/linux/arch/oal_schedule.h
+@@ -80,7 +80,7 @@ typedef struct _oal_spin_lock_stru_
+ typedef oal_uint32              (*oal_irqlocked_func)(oal_void *);
+ 
+ typedef rwlock_t                oal_rwlock_stru;
+-typedef struct timer_list              oal_timer_list_stru;
++/* oal_timer_list_stru is defined after oal_timer_func below (timer_list lost .data in 4.15) */
+ 
+ 
+ typedef struct tasklet_struct       oal_tasklet_stru;
+@@ -89,7 +89,7 @@ typedef oal_void                    (*oal_defer_func)(oal_uint);
+ /* tasklet声明 */
+ #define OAL_DECLARE_TASK    DECLARE_TASKLET
+ 
+-typedef wait_queue_t         oal_wait_queue_stru;
++typedef wait_queue_entry_t   oal_wait_queue_stru;
+ typedef wait_queue_head_t    oal_wait_queue_head_stru;
+ 
+ /**
+@@ -155,6 +155,17 @@ typedef wait_queue_head_t    oal_wait_queue_head_stru;
+ 
+ #define oal_in_atomic()     in_atomic()
+ typedef void (*oal_timer_func)(oal_uint);
++/* p9 port: wrapper keeping the old (function, unsigned long data) timer semantics */
++typedef struct {
++    struct timer_list timer;
++    oal_timer_func    func;
++    oal_uint          data;
++} oal_timer_list_stru;
++static inline void oal_timer_trampoline(struct timer_list *t)
++{
++    oal_timer_list_stru *w = container_of(t, oal_timer_list_stru, timer);
++    w->func(w->data);
++}
+ 
+ typedef oal_uint32 (*oal_module_func_t)(oal_void);
+ 
+@@ -764,9 +775,9 @@ OAL_STATIC OAL_INLINE oal_int32  oal_atomic_dec_and_test(oal_atomic *p_vector)
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_void  oal_time_get_stamp_us(oal_time_us_stru *pst_usec)
+ {
+-    struct timespec ts;
++    struct timespec64 ts;
+ 
+-    getnstimeofday(&ts);
++    ktime_get_real_ts64(&ts);
+ 
+     pst_usec->i_sec     = ts.tv_sec;
+ 
+@@ -832,10 +843,10 @@ OAL_STATIC OAL_INLINE oal_time_t_stru oal_ktime_sub(const oal_time_t_stru lhs, c
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_void  oal_timer_init(oal_timer_list_stru *pst_timer, oal_uint32 ul_delay, oal_timer_func p_func, oal_uint ui_arg)
+ {
+-    init_timer(pst_timer);
+-    pst_timer->expires = jiffies + msecs_to_jiffies(ul_delay);
+-    pst_timer->function = p_func;
++    timer_setup(&pst_timer->timer, oal_timer_trampoline, 0);
++    pst_timer->func = p_func;
+     pst_timer->data = ui_arg;
++    pst_timer->timer.expires = jiffies + msecs_to_jiffies(ul_delay);
+ }
+ 
+ /*****************************************************************************
+@@ -855,7 +866,7 @@ OAL_STATIC OAL_INLINE oal_void  oal_timer_init(oal_timer_list_stru *pst_timer, o
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_int32  oal_timer_delete(oal_timer_list_stru *pst_timer)
+ {
+-    return del_timer(pst_timer);
++    return timer_delete(&pst_timer->timer);
+ }
+ 
+ /*****************************************************************************
+@@ -875,7 +886,7 @@ OAL_STATIC OAL_INLINE oal_int32  oal_timer_delete(oal_timer_list_stru *pst_timer
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_int32  oal_timer_delete_sync(oal_timer_list_stru *pst_timer)
+ {
+-    return del_timer_sync(pst_timer);
++    return timer_delete_sync(&pst_timer->timer);
+ }
+ 
+ /*****************************************************************************
+@@ -895,7 +906,7 @@ OAL_STATIC OAL_INLINE oal_int32  oal_timer_delete_sync(oal_timer_list_stru *pst_
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_void  oal_timer_add(oal_timer_list_stru *pst_timer)
+ {
+-    add_timer(pst_timer);
++    add_timer(&pst_timer->timer);
+ }
+ 
+ /*****************************************************************************
+@@ -916,7 +927,7 @@ OAL_STATIC OAL_INLINE oal_void  oal_timer_add(oal_timer_list_stru *pst_timer)
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_int32  oal_timer_start(oal_timer_list_stru *pst_timer, oal_uint ui_delay)
+ {
+-    return mod_timer(pst_timer, (jiffies + msecs_to_jiffies(ui_delay)));
++    return mod_timer(&pst_timer->timer, (jiffies + msecs_to_jiffies(ui_delay)));
+ }
+ 
+ /*****************************************************************************
+@@ -937,8 +948,8 @@ OAL_STATIC OAL_INLINE oal_int32  oal_timer_start(oal_timer_list_stru *pst_timer,
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_void  oal_timer_start_on(oal_timer_list_stru *pst_timer, oal_uint ui_delay, oal_int32 cpu)
+ {
+-    pst_timer->expires = jiffies + msecs_to_jiffies(ui_delay);
+-    add_timer_on(pst_timer, cpu);
++    pst_timer->timer.expires = jiffies + msecs_to_jiffies(ui_delay);
++    add_timer_on(&pst_timer->timer, cpu);
+ }
+ 
+ /*****************************************************************************
+@@ -1209,11 +1220,11 @@ OAL_STATIC OAL_INLINE oal_void oal_smp_task_lock_init(oal_task_lock_stru* pst_lo
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_uint64 oal_get_time_stamp_from_timeval(oal_void)
+ {
+-    struct timeval tv;
++    struct timespec64 tv;
+     oal_uint64 curr_time;
+ 
+-    do_gettimeofday(&tv);
+-    curr_time = tv.tv_usec;
++    ktime_get_real_ts64(&tv);
++    curr_time = tv.tv_nsec / 1000;
+     do_div(curr_time, 1000);
+     curr_time = curr_time + tv.tv_sec * 1000;
+ 
+diff --git a/hisi/platform/inc/oal/linux/arch/oal_util.h b/hisi/platform/inc/oal/linux/arch/oal_util.h
+index 7d85dc4..db1e369 100755
+--- a/hisi/platform/inc/oal/linux/arch/oal_util.h
++++ b/hisi/platform/inc/oal/linux/arch/oal_util.h
+@@ -208,7 +208,7 @@ typedef struct kobject              oal_kobject;
+ /* static inline void eth_random_addr(u8 *addr) */
+ static OAL_INLINE void oal_random_ether_addr(oal_uint8 *addr)
+ {
+-   random_ether_addr(addr);
++   eth_random_addr(addr);
+ }
+ 
+ /*****************************************************************************
+@@ -493,7 +493,7 @@ OAL_STATIC OAL_INLINE oal_int32  oal_file_read(oal_file_stru *file,
+ 		                                         oal_int8 *pc_buf,
+ 		                                         oal_uint32 ul_count)
+ {
+-    return kernel_read(file, 0, pc_buf, ul_count);
++    { loff_t pos = 0; return kernel_read(file, pc_buf, ul_count, &pos); }
+ }
+ 
+ /*****************************************************************************
+@@ -876,7 +876,7 @@ OAL_STATIC OAL_INLINE oal_void  oal_msleep(oal_uint32 ul_usecs)
+ *****************************************************************************/
+ OAL_STATIC OAL_INLINE oal_int8 *oal_strncpy(oal_int8 *pc_dest, OAL_CONST oal_int8 *pc_src, oal_uint32 ul_len)
+ {
+-    return strncpy((oal_int8 *)pc_dest, pc_src, ul_len);
++    strscpy_pad((char *)pc_dest, pc_src, ul_len); return pc_dest;
+ }
+ 
+ /*****************************************************************************
+diff --git a/hisi/platform/plat_1102_v8r2_defconfig b/hisi/platform/plat_1102_v8r2_defconfig
+index cf63c75..42b2a58 100755
+--- a/hisi/platform/plat_1102_v8r2_defconfig
++++ b/hisi/platform/plat_1102_v8r2_defconfig
+@@ -183,7 +183,7 @@ DEBFLAGS += --coverage
+ endif
+ 
+ # set compiler CFLAG
+-EXTRA_CFLAGS = $(INCS) $(COPTS) $(DEBFLAGS)
++ccflags-y = $(INCS) $(COPTS) $(DEBFLAGS)
+ 
+ #COPTS +=-D_PRE_WLAN_PROFLING_SOC
+ 
+diff --git a/hisi/platform/plat_1103_default_defconfig b/hisi/platform/plat_1103_default_defconfig
+index 7a16eca..fddbf81 100755
+--- a/hisi/platform/plat_1103_default_defconfig
++++ b/hisi/platform/plat_1103_default_defconfig
+@@ -180,7 +180,7 @@ DEBFLAGS += --coverage
+ endif
+ 
+ # set compiler CFLAG
+-EXTRA_CFLAGS = $(INCS) $(COPTS) $(DEBFLAGS)
++ccflags-y = $(INCS) $(COPTS) $(DEBFLAGS)
+ 
+ #COPTS +=-D_PRE_WLAN_PROFLING_SOC
+ 
+diff --git a/hisi/wifi/Makefile b/hisi/wifi/Makefile
+index d7e6bb6..11583f9 100755
+--- a/hisi/wifi/Makefile
++++ b/hisi/wifi/Makefile
+@@ -101,11 +101,11 @@ ifneq ($(TARGET_BUILD_VARIANT),user)
+ KBUILD_CFLAGS += -DPLATFORM_DEBUG_ENABLE
+ endif
+ 
+-EXTRA_CFLAGS = $(HI1102_INCLUDES) $(COPTS)
+-EXTRA_CFLAGS += $(COPTS)
+-EXTRA_CFLAGS += $(COMM_COPTS)
+-EXTRA_CFLAGS += -Werror
+-EXTRA_CFLAGS +=  -fno-pic
++ccflags-y = $(HI1102_INCLUDES) $(COPTS)
++ccflags-y += $(COPTS)
++ccflags-y += $(COMM_COPTS)
++ccflags-y +=
++ccflags-y +=  -fno-pic
+ MODFLAGS = -fno-pic
+ else
+ #make modules
+diff --git a/hisi/wifi/wifi_1102_v8r2_defconfig b/hisi/wifi/wifi_1102_v8r2_defconfig
+index ccb8d96..f39e4ee 100755
+--- a/hisi/wifi/wifi_1102_v8r2_defconfig
++++ b/hisi/wifi/wifi_1102_v8r2_defconfig
+@@ -136,7 +136,7 @@ DEBFLAGS += --coverage
+ endif
+ 
+ # set compiler CFLAG
+-EXTRA_CFLAGS = $(INCS) $(COPTS) $(DEBFLAGS)
++ccflags-y = $(INCS) $(COPTS) $(DEBFLAGS)
+ 
+ #roam support
+ COPTS +=-D_PRE_WLAN_FEATURE_ROAM
+diff --git a/hisi/wifi/wifi_1103_default_defconfig b/hisi/wifi/wifi_1103_default_defconfig
+index 8b10e70..cda011f 100755
+--- a/hisi/wifi/wifi_1103_default_defconfig
++++ b/hisi/wifi/wifi_1103_default_defconfig
+@@ -132,7 +132,7 @@ DEBFLAGS += --coverage
+ endif
+ 
+ # set compiler CFLAG
+-EXTRA_CFLAGS = $(INCS) $(COPTS) $(DEBFLAGS)
++ccflags-y = $(INCS) $(COPTS) $(DEBFLAGS)
+ 
+ #roam support
+ COPTS +=-D_PRE_WLAN_FEATURE_ROAM

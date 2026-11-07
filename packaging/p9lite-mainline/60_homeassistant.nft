@@ -1,0 +1,5 @@
+table inet filter {
+	chain input {
+		tcp dport 8123 accept comment "Home Assistant (open on r16 too: its 4.4 kernel never loaded this ruleset)"
+	}
+}

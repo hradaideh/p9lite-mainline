@@ -1,0 +1,409 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] Linux version 7.3.1 (root@978ae9a36230) (gcc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #5 SMP PREEMPT Sun Nov  1 14:41:15 UTC 2026
+[    0.000000] Machine model: hi6250
+[    0.000000] printk: debug: ignoring loglevel setting.
+[    0.000000] OF: reserved mem: 0x0000000007b00000..0x0000000007b07fff (32 KiB) map non-reusable ddr-training1@4F8000
+[    0.000000] OF: reserved mem: 0x000000000b000000..0x000000000dffffff (49152 KiB) map non-reusable logo-buffer
+[    0.000000] OF: reserved mem: 0x000000000e000000..0x000000000e000fff (4 KiB) nomap non-reusable mntndump
+[    0.000000] OF: reserved mem: 0x0000000031000000..0x0000000032a3ffff (26880 KiB) map non-reusable graphic
+[    0.000000] OF: reserved mem: 0x0000000034000000..0x00000000347fffff (8192 KiB) map non-reusable bbox-mem
+[    0.000000] OF: reserved mem: 0x0000000034800000..0x00000000348fffff (1024 KiB) map non-reusable pstore-mem
+[    0.000000] OF: reserved mem: 0x0000000034900000..0x00000000349fffff (1024 KiB) nomap non-reusable lpmx-core@34900000
+[    0.000000] OF: reserved mem: 0x0000000034a00000..0x0000000034a77fff (480 KiB) nomap non-reusable fka-mem
+[    0.000000] OF: reserved mem: 0x0000000034a78000..0x0000000034a7ffff (32 KiB) map non-reusable smmu-pdg
+[    0.000000] OF: reserved mem: 0x0000000034a80000..0x0000000034afffff (512 KiB) nomap non-reusable sensorhub-share-mem@34A80000
+[    0.000000] OF: reserved mem: 0x0000000034b00000..0x0000000034b1ffff (128 KiB) nomap non-reusable isp-boot@34B00000
+[    0.000000] OF: reserved mem: 0x0000000034f00000..0x00000000352fffff (4096 KiB) nomap non-reusable hifi-data@34F00000
+[    0.000000] OF: reserved mem: 0x0000000035300000..0x00000000353fffff (1024 KiB) nomap non-reusable hifi-ipc@35300000
+[    0.000000] OF: reserved mem: 0x0000000035400000..0x0000000035bfffff (8192 KiB) nomap non-reusable hifi-s@35400000
+[    0.000000] OF: reserved mem: 0x0000000035c00000..0x0000000035cbffff (768 KiB) nomap non-reusable bl31-s@35C00000
+[    0.000000] OF: reserved mem: 0x0000000036000000..0x00000000361fffff (2048 KiB) nomap non-reusable sensorhub-s@36000000
+[    0.000000] OF: reserved mem: 0x0000000036200000..0x0000000037ffffff (30720 KiB) nomap non-reusable secureos-s@36200000
+[    0.000000] OF: reserved mem: 0x0000000038000000..0x000000003ebfffff (110592 KiB) nomap non-reusable modem-s@38000000
+[    0.000000] OF: reserved mem: 0x000000003ec00000..0x000000003f0fffff (5120 KiB) nomap non-reusable modem-share-mem@3EC00000
+[    0.000000] OF: reserved mem: 0x000000005c000000..0x000000005c3fffff (4096 KiB) map reusable dts-decompress
+[    0.000000] OF: reserved mem: 0x0000000047b00000..0x0000000047b07fff (32 KiB) nomap non-reusable ddr-training2@0
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: Using PSCI v0.1 Function IDs from DT
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000000400000-0x000000007fffffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000400000-0x000000000dffffff]
+[    0.000000]   node   0: [mem 0x000000000e000000-0x000000000e000fff]
+[    0.000000]   node   0: [mem 0x000000000e001000-0x00000000348fffff]
+[    0.000000]   node   0: [mem 0x0000000034900000-0x0000000034a77fff]
+[    0.000000]   node   0: [mem 0x0000000034a78000-0x0000000034a7ffff]
+[    0.000000]   node   0: [mem 0x0000000034a80000-0x0000000034b1ffff]
+[    0.000000]   node   0: [mem 0x0000000034b20000-0x0000000034efffff]
+[    0.000000]   node   0: [mem 0x0000000034f00000-0x0000000035cbffff]
+[    0.000000]   node   0: [mem 0x0000000035cc0000-0x0000000035ffffff]
+[    0.000000]   node   0: [mem 0x0000000036000000-0x000000003f0fffff]
+[    0.000000]   node   0: [mem 0x000000003f100000-0x0000000047afffff]
+[    0.000000]   node   0: [mem 0x0000000047b00000-0x0000000047b07fff]
+[    0.000000]   node   0: [mem 0x0000000047b08000-0x000000007fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000400000-0x000000007fffffff]
+[    0.000000] On node 0, zone DMA: 1024 pages in unavailable ranges
+[    0.000000] percpu: Embedded 14 pages/cpu s26400 r0 d30944 u57344
+[    0.000000] pcpu-alloc: s26400 r0 d30944 u57344 alloc=14*4096
+[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: ignore_loglevel printk.time=1 panic=1 rdinit=/init p9test.reboot_delay=20 ramoops.mem_address=0x34800000 ramoops.mem_size=0x100000 ramoops.record_size=0x20000 ramoops.console_size=0x80000 ramoops.pmsg_size=0x20000 androidboot.swtype=normal fastboot_version=Dallas-Trunk_FASTBOOT setup_logctl=1 enter_recovery=0 androidboot.mode=normal pmu_nv_addr=0x34a20014 low_volt_flag=0 boardid=0x00001267 normal_reset_type=coldboot  TP_COLOR=135  COLOR_TMP=0 LCD_DENSITY=0 ddr_die=1024M@0M ddr_die=1024M@1024M  productid=0x3b41201a efuse_status=0 androidboot.serialno=<serial> himntn=011111111111101000100000000000000000000 boot_slice=0x0004bb46 reboot_reason=coldboot last_bootup_keypoint=32 recovery_update=0 userlock=unlocked bootlock=unlocked hw_bfm_enable=1 ddr_density=7 swiotlb=2 mdmreglogbase=0x00000000 mdmreglogsize=0x00000000 modem_socp_enable=0 androidboot.hardware=hi6250 androidboot.veritymode=enforcing androidboot.verifiedbootstate=ORANGE emmc_freqsel=0x00000011 format_data=1 \
+[    0.000000] Kernel command line: cpu_buck_reg=0x;;  LCD_ID=0 androidboot.ddrsize=2 kce_status=1  console=ttyS0 
+[    0.000000] Unknown kernel command line parameters "fastboot_version=Dallas-Trunk_FASTBOOT setup_logctl=1 enter_recovery=0 pmu_nv_addr=0x34a20014 low_volt_flag=0 boardid=0x00001267 normal_reset_type=coldboot TP_COLOR=135 COLOR_TMP=0 LCD_DENSITY=0 ddr_die=1024M@1024M productid=0x3b41201a efuse_status=0 himntn=011111111111101000100000000000000000000 boot_slice=0x0004bb46 reboot_reason=coldboot last_bootup_keypoint=32 recovery_update=0 userlock=unlocked bootlock=unlocked hw_bfm_enable=1 ddr_density=7 mdmreglogbase=0x00000000 mdmreglogsize=0x00000000 modem_socp_enable=0 emmc_freqsel=0x00000011 format_data=1 cpu_buck_reg=0x;; LCD_ID=0 kce_status=1", will be passed to user space.
+[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] software IO TLB: area num 8.
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size roundup to 2MB
+[    0.000000] software IO TLB: mapped [mem 0x000000007d490000-0x000000007d690000] (2MB)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 523264
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+[    0.000000] rcu: Hierarchical RCU implementation.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] Root IRQ handler: gic_handle_irq
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.000000] arch_timer: cp15 timer running at 1.92MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x1c570327e, max_idle_ns: 1763180809505 ns
+[    0.000001] sched_clock: 56 bits at 1920kHz, resolution 520ns, wraps every 4398046510977ns
+[    0.000126] clocksource: arm,sp804: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 58327039986419 ns
+[    0.001822] Console: colour dummy device 80x25
+[    0.001868] Calibrating delay loop (skipped), value calculated using timer frequency.. 3.84 BogoMIPS (lpj=7680)
+[    0.001878] pid_max: default: 32768 minimum: 301
+[    0.002115] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.002128] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.002401] VFS: Finished mounting rootfs on nullfs
+[    0.003693] rcu: Hierarchical SRCU implementation.
+[    0.003697] rcu: 	Max phase no-delay instances is 1000.
+[    0.004142] smp: Bringing up secondary CPUs ...
+[    0.004548] Detected VIPT I-cache on CPU1
+[    0.004624] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.005080] Detected VIPT I-cache on CPU2
+[    0.005121] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.005541] Detected VIPT I-cache on CPU3
+[    0.005579] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.006571] Detected VIPT I-cache on CPU4
+[    0.006644] CPU4: Booted secondary processor 0x0000000102 [0x410fd034]
+[    0.007115] Detected VIPT I-cache on CPU5
+[    0.007152] CPU5: Booted secondary processor 0x0000000103 [0x410fd034]
+[    0.007573] Detected VIPT I-cache on CPU6
+[    0.007613] CPU6: Booted secondary processor 0x0000000100 [0x410fd034]
+[    0.008098] Detected VIPT I-cache on CPU7
+[    0.008140] CPU7: Booted secondary processor 0x0000000101 [0x410fd034]
+[    0.008201] smp: Brought up 1 node, 8 CPUs
+[    0.008207] SMP: Total of 8 processors activated.
+[    0.008209] CPU: All CPU(s) started at EL1
+[    0.008212] CPU features: detected: 32-bit EL0 Support
+[    0.008216] CPU features: detected: CRC32 instructions
+[    0.008261] alternatives: applying system-wide alternatives
+[    0.009246] Memory: 1783392K/2093056K available (3712K kernel code, 634K rwdata, 884K rodata, 896K init, 221K bss, 305380K reserved, 0K cma-reserved)
+[    0.009840] devtmpfs: initialized
+[    0.054515] posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+[    0.054643] futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[    0.055868] p9test: ramoops record-size -> 0x20000 (u32)
+[    0.055882] p9test: ramoops console-size -> 0x80000 (u32)
+[    0.055892] p9test: ramoops ftrace-size -> 0x0 (u32)
+[    0.055902] p9test: ramoops pmsg-size -> 0x20000 (u32)
+[    0.055935] p9test: console zone is RAM, vmap wc -> (____ptrval____)
+[    0.055985] p9test: watchdog feeder + bootloader-restart handler active (wdt=(____ptrval____) pmu=(____ptrval____) nmi=(____ptrval____))
+[    0.056590] DMA: preallocated 256 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.056736] cpuidle: using governor ladder
+[    0.056846] ASID allocator initialised with 65536 entries
+[    0.056900] Serial: AMBA PL011 UART driver
+[    0.103214] clocksource: Switched to clocksource arch_sys_counter
+[    0.107841] Unpacking initramfs...
+[    0.109100] Freeing initrd memory: 20K
+[    0.109889] workingset: timestamp_bits=62 (anon: 57) max_order=19 bucket_order=0 (anon: 0)
+[    0.111589] pinctrl-single e896c000.pinmux: please update dts to use #pinctrl-cells = <1>
+[    0.111797] pinctrl-single e896c000.pinmux: 138 pins, size 552
+[    0.112856] pinctrl-single fff11000.pinmux: please update dts to use #pinctrl-cells = <1>
+[    0.112942] pinctrl-single fff11000.pinmux: 43 pins, size 172
+[    0.113264] pinctrl-single e896c800.pinmux: please update dts to use #pinctrl-cells = <1>
+[    0.113440] pinctrl-single e896c800.pinmux: 141 pins, size 564
+[    0.114537] pinctrl-single fff11800.pinmux: please update dts to use #pinctrl-cells = <1>
+[    0.114619] pinctrl-single fff11800.pinmux: 47 pins, size 188
+[    0.116322] pl061_gpio e8a0b000.gpio: PL061 GPIO chip registered
+[    0.116660] pl061_gpio e8a0c000.gpio: PL061 GPIO chip registered
+[    0.116943] pl061_gpio e8a0d000.gpio: PL061 GPIO chip registered
+[    0.117217] pl061_gpio e8a0e000.gpio: PL061 GPIO chip registered
+[    0.117488] pl061_gpio e8a0f000.gpio: PL061 GPIO chip registered
+[    0.117789] pl061_gpio e8a10000.gpio: PL061 GPIO chip registered
+[    0.118088] pl061_gpio e8a11000.gpio: PL061 GPIO chip registered
+[    0.118363] pl061_gpio e8a12000.gpio: PL061 GPIO chip registered
+[    0.118635] pl061_gpio e8a13000.gpio: PL061 GPIO chip registered
+[    0.118938] pl061_gpio e8a14000.gpio: PL061 GPIO chip registered
+[    0.119227] pl061_gpio e8a15000.gpio: PL061 GPIO chip registered
+[    0.119541] pl061_gpio e8a16000.gpio: PL061 GPIO chip registered
+[    0.119833] pl061_gpio e8a17000.gpio: PL061 GPIO chip registered
+[    0.120121] pl061_gpio e8a18000.gpio: PL061 GPIO chip registered
+[    0.120394] pl061_gpio e8a19000.gpio: PL061 GPIO chip registered
+[    0.120692] pl061_gpio e8a1a000.gpio: PL061 GPIO chip registered
+[    0.120983] pl061_gpio e8a1b000.gpio: PL061 GPIO chip registered
+[    0.121259] pl061_gpio e8a1c000.gpio: PL061 GPIO chip registered
+[    0.121569] pl061_gpio e8a1d000.gpio: PL061 GPIO chip registered
+[    0.121865] pl061_gpio e8a1e000.gpio: PL061 GPIO chip registered
+[    0.122177] pl061_gpio e8a1f000.gpio: PL061 GPIO chip registered
+[    0.122459] pl061_gpio e8a20000.gpio: PL061 GPIO chip registered
+[    0.122759] pl061_gpio fff0b000.gpio: PL061 GPIO chip registered
+[    0.123028] pl061_gpio fff0c000.gpio: PL061 GPIO chip registered
+[    0.123365] pl061_gpio fff0d000.gpio: PL061 GPIO chip registered
+[    0.123666] pl061_gpio fff0e000.gpio: PL061 GPIO chip registered
+[    0.123970] pl061_gpio fff0f000.gpio: PL061 GPIO chip registered
+[    0.124263] pl061_gpio fff10000.gpio: PL061 GPIO chip registered
+[    0.124553] pl061_gpio fff1d000.gpio: PL061 GPIO chip registered
+[    0.124835] pl061_gpio fff1e000.gpio: PL061 GPIO chip registered
+[    0.125122] pl061_gpio fff1f000.gpio: PL061 GPIO chip registered
+[    0.126280] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.140204] fdf02000.uart: ttyAMA0 MMIO:0x00000000fdf02000 (irq = 47, base_baud = 0) is a PL011 rev2
+[    0.141792] fff32000.uart: ttyAMA6 MMIO:0x00000000fff32000 (irq = 49, base_baud = 0) is a PL011 rev2
+[    0.143597] clk: Disabling unused clocks
+[    0.143633] p9test: report + reboot to bootloader in 20s
+[    0.143676] Warning: unable to open an initial console.
+[    0.144010] Freeing unused kernel memory: 896K
+[    0.144095] Run /init as init process
+[    0.144098]   with arguments:
+[    0.144099]     /init
+[    0.144101]   with environment:
+[    0.144103]     HOME=/
+[    0.144105]     TERM=linux
+[    0.144107]     fastboot_version=Dallas-Trunk_FASTBOOT
+[    0.144109]     setup_logctl=1
+[    0.144111]     enter_recovery=0
+[    0.144114]     pmu_nv_addr=0x34a20014
+[    0.144116]     low_volt_flag=0
+[    0.144118]     boardid=0x00001267
+[    0.144120]     normal_reset_type=coldboot
+[    0.144122]     TP_COLOR=135
+[    0.144124]     COLOR_TMP=0
+[    0.144126]     LCD_DENSITY=0
+[    0.144128]     ddr_die=1024M@1024M
+[    0.144131]     productid=0x3b41201a
+[    0.144133]     efuse_status=0
+[    0.144135]     himntn=011111111111101000100000000000000000000
+[    0.144137]     boot_slice=0x0004bb46
+[    0.144139]     reboot_reason=coldboot
+[    0.144141]     last_bootup_keypoint=32
+[    0.144143]     recovery_update=0
+[    0.144145]     userlock=unlocked
+[    0.144148]     bootlock=unlocked
+[    0.144150]     hw_bfm_enable=1
+[    0.144152]     ddr_density=7
+[    0.144154]     mdmreglogbase=0x00000000
+[    0.144156]     mdmreglogsize=0x00000000
+[    0.144158]     modem_socp_enable=0
+[    0.144160]     emmc_freqsel=0x00000011
+[    0.144163]     format_data=1
+[    0.144165]     cpu_buck_reg=0x;;
+[    0.144167]     LCD_ID=0
+[    0.144169]     kce_status=1
+[    0.144892] p9init: userspace /init reached on mainline kernel
+[   10.171497] random: crng init done
+[   21.632564] p9test: ===== REPORT uptime=21s cpus_online=8/8 totalram=1746MB =====
+[   21.632588] p9test: platform dev uartctl driver=-
+[   21.632594] p9test: platform dev fastboot_charger driver=-
+[   21.632598] p9test: platform dev coul_core driver=-
+[   21.632602] p9test: platform dev fastboot_core driver=-
+[   21.632605] p9test: platform dev fastboot_battery driver=-
+[   21.632608] p9test: platform dev fastboot driver=-
+[   21.632612] p9test: platform dev battery driver=-
+[   21.632616] p9test: platform dev huawei,lcd_panel driver=-
+[   21.632619] p9test: platform dev e8050000.slimbusmisc driver=-
+[   21.632623] p9test: platform dev fffc0000.ddr_devfreq driver=-
+[   21.632627] p9test: platform dev fffc0000.ddr_devfreq_up_threshold driver=-
+[   21.632631] p9test: platform dev e8600000.framebuffer driver=-
+[   21.632634] p9test: platform dev e896c000.pinmux driver=pinctrl-single
+[   21.632639] p9test: platform dev fff11000.pinmux driver=pinctrl-single
+[   21.632643] p9test: platform dev e896c800.pinmux driver=pinctrl-single
+[   21.632646] p9test: platform dev fff11800.pinmux driver=pinctrl-single
+[   21.632651] p9test: platform dev amba driver=simple-pm-bus
+[   21.632655] p9test: platform dev ffd73000.i2c driver=-
+[   21.632659] p9test: platform dev fdf0d000.i2c driver=-
+[   21.632663] p9test: platform dev ffd7c000.watchdog driver=-
+[   21.632666] p9test: platform dev ff010000.dx_cc63p driver=-
+[   21.632670] p9test: platform dev fff35000.ip_freq_autodown driver=-
+[   21.632673] p9test: platform dev e8970000.mali driver=-
+[   21.632677] p9test: platform dev ipa-sensor@0 driver=-
+[   21.632680] p9test: platform dev fff0a308.18.jtagtosd driver=-
+[   21.632684] p9test: platform dev e82b9000.codec_controller driver=-
+[   21.632688] p9test: platform dev fastboot_pmic_mntn driver=-
+[   21.632692] p9test: platform dev rdr driver=-
+[   21.632695] p9test: platform dev himntn driver=-
+[   21.632698] p9test: platform dev sysctrl_reason driver=-
+[   21.632702] p9test: platform dev modem_pinctrl driver=-
+[   21.632706] p9test: platform dev e8100000.cci driver=-
+[   21.632709] p9test: platform dev e8100000.cci_extra driver=-
+[   21.632714] p9test: platform dev timer driver=-
+[   21.632717] p9test: platform dev hwspinlock driver=-
+[   21.632720] p9test: platform dev fffc0000.ddr_devfreq_latency driver=-
+[   21.632725] p9test: platform dev fffc0000.ddr driver=-
+[   21.632728] p9test: platform dev ddr_seccfg driver=-
+[   21.632732] p9test: platform dev bootdevice driver=-
+[   21.632736] p9test: platform dev ff390000.sdhci driver=-
+[   21.632740] p9test: platform dev ff37f000.dwmmc1 driver=-
+[   21.632744] p9test: platform dev ff37d000.dwmmc2 driver=-
+[   21.632748] p9test: platform dev e896b000.ipc driver=-
+[   21.632752] p9test: platform dev e8582000.ipc driver=-
+[   21.632756] p9test: platform dev fe000000.usb driver=-
+[   21.632759] p9test: platform dev ff100000.hisi_usb driver=-
+[   21.632763] p9test: platform dev ff200000.usb_otg_ahbif driver=-
+[   21.632767] p9test: platform dev hisi,ion driver=-
+[   21.632771] p9test: platform dev smmu driver=-
+[   21.632775] p9test: platform dev efuse driver=-
+[   21.632779] p9test: platform dev hisi_noc@0 driver=-
+[   21.632783] p9test: platform dev hisi_QoS@0 driver=-
+[   21.632786] p9test: platform dev fff35000.regulator_hi3xxx driver=-
+[   21.632791] p9test: platform dev fff34000.pmic driver=-
+[   21.632794] p9test: platform dev fff08000.syscounter driver=-
+[   21.632798] p9test: platform dev scharger_power driver=-
+[   21.632802] p9test: platform dev peripherals driver=simple-pm-bus
+[   21.632806] p9test: platform dev fdf30000.dma driver=-
+[   21.632810] p9test: platform dev ffd77000.dma driver=-
+[   21.632814] p9test: platform dev e8800000.vdec driver=-
+[   21.632817] p9test: platform dev trusted_core driver=-
+[   21.632821] p9test: platform dev e8900000.venc driver=-
+[   21.632825] p9test: platform dev fff0a000.rdr_ap_adapter driver=-
+[   21.632829] p9test: platform dev ramoops driver=-
+[   21.632833] p9test: platform dev panel_hdmi_fake driver=-
+[   21.632836] p9test: platform dev panel_offlinecomposer driver=-
+[   21.632841] p9test: platform dev huawei,hisi_isp110 driver=-
+[   21.632844] p9test: platform dev e840000000200000.isp driver=-
+[   21.632848] p9test: platform dev e840600000001000.ispsmmu driver=-
+[   21.632852] p9test: platform dev huawei,camcfgdev driver=-
+[   21.632856] p9test: platform dev huawei,scharger_flash driver=-
+[   21.632860] p9test: platform dev fff0a308.18.djtagtosd driver=-
+[   21.632864] p9test: platform dev pmu driver=-
+[   21.632867] p9test: platform dev huawei,ov8856 driver=-
+[   21.632871] p9test: platform dev huawei,t4ka3 driver=-
+[   21.632875] p9test: platform dev huawei,hi843 driver=-
+[   21.632879] p9test: platform dev huawei,imx219 driver=-
+[   21.632882] p9test: platform dev huawei,imx214 driver=-
+[   21.632885] p9test: platform dev ddrflux driver=-
+[   21.632890] p9test: platform dev fff32000.lowpm_func driver=-
+[   21.632893] p9test: platform dev hisi_timekeeper@fff1b000 driver=-
+[   21.632897] p9test: platform dev hifi_voice_proxy driver=-
+[   21.632901] p9test: platform dev fff19000.flp driver=-
+[   21.632905] p9test: platform dev support-target driver=-
+[   21.632908] p9test: platform dev target-cpu driver=-
+[   21.632912] p9test: platform dev tsens@0 driver=-
+[   21.632916] p9test: platform dev hisi_tm@1 driver=-
+[   21.632919] p9test: platform dev usbswitch driver=-
+[   21.632923] p9test: platform dev devcheck driver=-
+[   21.632927] p9test: platform dev hw_connectivity driver=-
+[   21.632931] p9test: platform dev hi1102 driver=-
+[   21.632934] p9test: platform dev hisi_wifi driver=-
+[   21.632938] p9test: platform dev hisi_bfgx driver=-
+[   21.632942] p9test: platform dev gps_power driver=-
+[   21.632945] p9test: platform dev balong_timer_app driver=-
+[   21.632950] p9test: platform dev fff0a534.timerslice driver=-
+[   21.632954] p9test: platform dev fff0a534.timer_stamp driver=-
+[   21.632957] p9test: platform dev fff08000.hrttimer_app driver=-
+[   21.632961] p9test: platform dev softtimer_type_support driver=-
+[   21.632965] p9test: platform dev fdf21000.ipc_hisi_modem driver=-
+[   21.632969] p9test: platform dev fdf22000.ipc_hisi_modem_s driver=-
+[   21.632973] p9test: platform dev e896b000.ipc_hisi_v230_mdm driver=-
+[   21.632977] p9test: platform dev icc_channels_app driver=-
+[   21.632981] p9test: platform dev fff0a000.sysctrl_app driver=-
+[   21.632984] p9test: platform dev hwadp driver=-
+[   21.632989] p9test: platform dev watchdog_app@0 driver=-
+[   21.632992] p9test: platform dev cp_reset@0 driver=-
+[   21.632996] p9test: platform dev fff35000.sysctrl_fiq driver=-
+[   21.633000] p9test: platform dev dsp@49000000 driver=-
+[   21.633004] p9test: platform dev pmic_ocp_modem driver=-
+[   21.633007] p9test: platform dev ff030000.socp1 driver=-
+[   21.633011] p9test: platform dev smntn_type driver=-
+[   21.633015] p9test: platform dev coresight-tmc-cp driver=-
+[   21.633019] p9test: platform dev coresight-etm-cp driver=-
+[   21.633023] p9test: platform dev e020000000001000.modem_sysctrl driver=-
+[   21.633027] p9test: platform dev fff35000.perctrl2reg driver=-
+[   21.633031] p9test: platform dev apr_config driver=-
+[   21.633034] p9test: platform dev ff031000.ipf1 driver=-
+[   21.633039] p9test: platform dev ff040000.psam1 driver=-
+[   21.633042] p9test: platform dev huawei_charger driver=-
+[   21.633046] p9test: platform dev charging_core driver=-
+[   21.633050] p9test: platform dev hisi_battery driver=-
+[   21.633053] p9test: platform dev hisi_coul_test driver=-
+[   21.633057] p9test: platform dev hisi_vibrator@fff34000 driver=-
+[   21.633060] p9test: platform dev deviceboxID@0 driver=-
+[   21.633064] p9test: platform dev boe_otm1906c_5p2_1080p_cmd driver=-
+[   21.633068] p9test: platform dev hw_antenna_board_match driver=-
+[   21.633072] p9test: platform dev antenna_board_adc_match driver=-
+[   21.633076] p9test: platform dev maxim_ioctl driver=-
+[   21.633080] p9test: platform dev psci driver=-
+[   21.633083] p9test: platform dev cpufreq-bL driver=-
+[   21.633087] p9test: platform dev fff34000.pmu driver=-
+[   21.633091] p9test: platform dev fff32000.lowpm_test driver=-
+[   21.633094] p9test: platform dev fff0a000.sysctrl driver=-
+[   21.633098] p9test: platform dev e8a09000.pctrl driver=-
+[   21.633102] p9test: platform dev fff35000.crgctrl driver=-
+[   21.633105] p9test: platform dev ffd7e000.crgctrl driver=-
+[   21.633109] p9test: platform dev fff31000.pmctrl driver=-
+[   21.633113] p9test: platform dev hisi_axierr driver=-
+[   21.633117] p9test: platform dev fff0e000.powerhold driver=-
+[   21.633120] p9test: platform dev hisi_reset driver=-
+[   21.633124] p9test: platform dev hisi_gpio_key driver=-
+[   21.633128] p9test: platform dev sound driver=-
+[   21.633131] p9test: platform dev hi6210_hifi driver=-
+[   21.633135] p9test: platform dev slimbus_dai@0 driver=-
+[   21.633139] p9test: platform dev e804b000.asp_dmac driver=-
+[   21.633143] p9test: platform dev hifidsp driver=-
+[   21.633146] p9test: platform dev sochifi_watchdog driver=-
+[   21.633150] p9test: platform dev touchscreen driver=-
+[   21.633153] p9test: platform dev sensorhub_status driver=-
+[   21.633157] p9test: platform dev sensorhub_nmi driver=-
+[   21.633160] p9test: platform dev sensorhub_ex driver=-
+[   21.633164] p9test: platform dev sensorhub_io_power driver=-
+[   21.633167] p9test: platform dev hisi_cust_cfg driver=-
+[   21.633171] p9test: platform dev hisi_gps driver=-
+[   21.633174] p9test: platform dev HW-OCP driver=-
+[   21.633177] p9test: platform dev fingerprint driver=-
+[   21.633181] p9test: platform dev serial8250 driver=serial8250
+[   21.633185] p9test: platform dev psci-cpuidle driver=psci-cpuidle
+[   21.633192] p9test: amba dev e8a0b000.gpio driver=pl061_gpio
+[   21.633196] p9test: amba dev e8a0c000.gpio driver=pl061_gpio
+[   21.633200] p9test: amba dev e8a0d000.gpio driver=pl061_gpio
+[   21.633204] p9test: amba dev e8a0e000.gpio driver=pl061_gpio
+[   21.633207] p9test: amba dev e8a0f000.gpio driver=pl061_gpio
+[   21.633210] p9test: amba dev e8a10000.gpio driver=pl061_gpio
+[   21.633214] p9test: amba dev e8a11000.gpio driver=pl061_gpio
+[   21.633218] p9test: amba dev e8a12000.gpio driver=pl061_gpio
+[   21.633221] p9test: amba dev e8a13000.gpio driver=pl061_gpio
+[   21.633225] p9test: amba dev e8a14000.gpio driver=pl061_gpio
+[   21.633229] p9test: amba dev e8a15000.gpio driver=pl061_gpio
+[   21.633233] p9test: amba dev e8a16000.gpio driver=pl061_gpio
+[   21.633236] p9test: amba dev e8a17000.gpio driver=pl061_gpio
+[   21.633240] p9test: amba dev e8a18000.gpio driver=pl061_gpio
+[   21.633244] p9test: amba dev e8a19000.gpio driver=pl061_gpio
+[   21.633248] p9test: amba dev e8a1a000.gpio driver=pl061_gpio
+[   21.633251] p9test: amba dev e8a1b000.gpio driver=pl061_gpio
+[   21.633255] p9test: amba dev e8a1c000.gpio driver=pl061_gpio
+[   21.633258] p9test: amba dev e8a1d000.gpio driver=pl061_gpio
+[   21.633262] p9test: amba dev e8a1e000.gpio driver=pl061_gpio
+[   21.633266] p9test: amba dev e8a1f000.gpio driver=pl061_gpio
+[   21.633269] p9test: amba dev e8a20000.gpio driver=pl061_gpio
+[   21.633273] p9test: amba dev fff0b000.gpio driver=pl061_gpio
+[   21.633277] p9test: amba dev fff0c000.gpio driver=pl061_gpio
+[   21.633280] p9test: amba dev fff0d000.gpio driver=pl061_gpio
+[   21.633284] p9test: amba dev fff0e000.gpio driver=pl061_gpio
+[   21.633288] p9test: amba dev fff0f000.gpio driver=pl061_gpio
+[   21.633291] p9test: amba dev fff10000.gpio driver=pl061_gpio
+[   21.633295] p9test: amba dev fff1d000.gpio driver=pl061_gpio
+[   21.633298] p9test: amba dev fff1e000.gpio driver=pl061_gpio
+[   21.633302] p9test: amba dev fff1f000.gpio driver=pl061_gpio
+[   21.633306] p9test: amba dev fdf02000.uart driver=uart-pl011
+[   21.633310] p9test: amba dev fdf03000.uart driver=-
+[   21.633314] p9test: amba dev ffd74000.uart driver=-
+[   21.633318] p9test: amba dev fdf01000.uart driver=-
+[   21.633321] p9test: amba dev fff32000.uart driver=uart-pl011
+[   21.633325] p9test: amba dev ffd70000.spi driver=-
+[   21.633329] p9test: amba dev fdf08000.spi driver=-
+[   21.633332] p9test: amba dev e8a06000.watchdog0 driver=-
+[   21.633336] p9test: amba dev fff14000.timer driver=-
+[   21.633339] p9test: ===== END REPORT, rebooting to bootloader =====
+[   21.633686] reboot: Restarting system with command 'bootloader'
+[   21.634439] p9test: restart requested -> Huawei bootloader (fastboot)

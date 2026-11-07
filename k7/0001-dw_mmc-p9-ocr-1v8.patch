@@ -1,0 +1,12 @@
+--- /work/dw_mmc.c.orig	2026-11-01 17:05:44.346565989 +0000
++++ drivers/mmc/host/dw_mmc.c	2026-11-01 17:05:44.354861332 +0000
+@@ -2845,6 +2845,9 @@
+ 
+ 	if (!mmc->ocr_avail)
+ 		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
++	/* P9 Lite: Hi1102 SDIO is 1.8 V only; no vmmc regulator describes it */
++	if (of_property_read_bool(host->dev->of_node, "p9,ocr-1v8"))
++		mmc->ocr_avail |= MMC_VDD_165_195;
+ 
+ 	ret = mmc_of_parse(mmc);
+ 	if (ret)
