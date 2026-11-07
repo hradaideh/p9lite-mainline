@@ -6,18 +6,21 @@ hw_lcd_on() (drivers/huawei_platform/lcd/hw_lcd_panel.c) over /dev/mem:
 The rails (hi6522 ldo3/boost4/cpn1, WLED) are left on by the bootloader.
 Without this the panel keeps the bootloader's state: it answers reads but ignores writes, its TE
 line stays low and the LDI never starts a frame.
-  p9panel-on.py [brightness 0-255]      (P9_HS=1: send the on-cmds in high-speed mode)
+  p9panel-on.py [brightness 0-255]
 
-STATUS 2026-11-07, not working yet. Verified on the phone:
-  - bootloader leaves PCTRL PERI_CTRL23 bit 3 (DSI0 PHY ref/cfg clock) at 0 -> set here;
-    CRG gates clk_txdphy0_ref/cfg and pclk_dsi0 are on; PHY PLL test codes match the vendor
-    calculation for 980 Mbit/s lanes (tc10=00 tc14=10 tc15=33 tc17=02 tc1d=05, 19.2 MHz ref).
-  - a PHY restart (PHY_RSTZ 0->7) clears the stuck TX, but afterwards the transmitter sends exactly
-    one 32-bit payload word and stalls (HS or LP, continuous clock or not, HS write timeout off):
-    the 2nd on-cmd (ff 19 06 01) never leaves the payload FIFO.
-  - reads (DCS 0x06 + BTA) keep working; the panel scans and has TE enabled before the reset.
-Next suspects: DSS-side gating of the DSI byte clock (LDI/DSS clock domains, media CRG 0xE86C0000)
-and the vendor dss/ldi init order (DSS must be clocked and LDI configured before DSI TX).
+STATUS 2026-11-07: the panel resets, all 55 on-cmds go out and it reports power mode 0x9C with
+backlight control on, but nothing is displayed. Findings:
+  - bootloader leaves PCTRL PERI_CTRL23 bit 3 (DSI0 PHY ref/cfg clock) at 0: short writes are lost
+    until it is set; with it set, short packets and reads work (HS).
+  - long packets (0x29/0x39) are the blocker: data lane 0 leaves stop state mid-packet and hangs
+    (PHY_STATUS bit 4 drops), in HS and LP, with or without auto clock lane, escape divider 7/14/28,
+    HS write timeout off, LDI off, and with the vendor read-modify-write access pattern. After a PHY
+    restart at most one long packet gets out, so this tool restarts the PHY before each one (enough
+    for the init list, not for pixel data, which also travels as long packets).
+  - verified equal to the vendor: PLL test codes (tc10=00 tc14=10 tc15=33 tc17=02 tc1d=05 @19.2 MHz),
+    escape divider 7, every DSS/DSI clock gate (CRG PEREN3/5, SCTRL SCPEREN1), host timing registers,
+    panel pinmux. The TE pin never toggles.
+Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation.
 """
 import mmap, os, struct, sys, time
 
@@ -26,6 +29,9 @@ GPIO2, RST_BIT = 0xE8A0D000, 4            # GPIO020 = bank 2 pin 4 (gpios[1] in 
 PCTRL = 0xE8A09000                        # PERI_CTRL23 (0x60) bit 3: pctrl_dphytx_ulpsexit0 = DSI0 PHY ref/cfg clock
 DSS, DSI, LDI = 0xE8600000, 0x1000, 0x7D000
 CMD_MODE_LP, CMD_MODE_HS = 0x010F7F00, 0
+# What works on this hardware: long packets (generic 0x29 / DCS 0x39) in low-power mode, short packets
+# and reads in high-speed. All-LP stalls the short writes/reads; all-HS never sends a long payload.
+CMD_MODE_INIT = 1 << 14 | 1 << 19                   # CMD_MODE_CFG gen_lw_tx | dcs_lw_tx
 
 fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
 dss = mmap.mmap(fd, 0x80000, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DSS)
@@ -52,7 +58,22 @@ def fifo_ready():
         time.sleep(0.0005)
     raise SystemExit("DSI command FIFO stuck, PKT_STATUS=%08x" % dr(0x74))
 
+def phy_restart():
+    """PHY_RSTZ 0 -> 7, wait for PLL lock and 4-lane stop state (vendor mipi_init, PLL settings kept)."""
+    mode = dr(0x68)
+    dw(0x04, 0); dw(0xA0, 0); time.sleep(0.001); dw(0xA0, 7)
+    for _ in range(500):
+        st = dr(0xB0)
+        if st & 1 and st & 0xA90 == 0xA90:
+            break
+        time.sleep(0.0005)
+    dw(0x04, 1); time.sleep(0.001); dw(0x68, mode)
+
 def send(dtype, payload):
+    if dtype not in (0x05, 0x15, 0x03, 0x13, 0x23):
+        # ponytail: after a PHY restart the DSI host transmits exactly one long packet and then stalls
+        # (cause unknown: PLL, clocks and host config all match the vendor). Restart before each one.
+        phy_restart()
     fifo_ready()
     if dtype in (0x05, 0x15, 0x03, 0x13, 0x23):               # short packets: data in the header
         p = list(payload) + [0, 0]
@@ -93,21 +114,13 @@ def main():
     # back, but every write is lost and long-packet payload sticks in the FIFO. Clock on, then reset
     # the DSI host core to flush whatever is stuck.
     wr(pctrl, 0x60, rd(pctrl, 0x60) | 1 << 3)
-    # PHY restart as in the vendor mipi_init (PLL settings kept): without it the transmitter never
-    # sends a long packet, even with the clock back on.
-    dw(0x04, 0); dw(0xA0, 0); time.sleep(0.002); dw(0xA0, 7)
-    for _ in range(500):
-        st = dr(0xB0)
-        if st & 1 and st & 0xA90 == 0xA90:                      # PLL lock + 4 data lanes in stop state
-            break
-        time.sleep(0.001)
-    dw(0x04, 1); time.sleep(0.005)
+    phy_restart()
     dr(0xBC); dr(0xC0)                                          # clear DSI error status
     reset(1); ms(2); reset(0); ms(3); reset(1); ms(4)           # first reset pulse
     ms(7)                                                       # LP-11
     reset(1); ms(8); reset(0); ms(9); reset(1); ms(10)          # second reset pulse
     ms(11)                                                      # TP reset -> LCD init
-    dw(0x68, CMD_MODE_HS if os.environ.get("P9_HS") else CMD_MODE_LP)   # vendor: init cmds in LP
+    dw(0x68, CMD_MODE_INIT)
     cmds = on_cmds()
     for n, (dtype, payload, wait) in enumerate(cmds):
         try:
