@@ -3,7 +3,7 @@
 pkgname=p9lite-mainline
 pkgver=1
 pkgrel=3
-pkgdesc="Huawei P9 lite mainline-kernel config: boot cmdline, boot_ok signal, Hi1102 init, HA firewall rule, Cloudflare Mesh forwarding/NAT, status display"
+pkgdesc="P9 lite mainline config: cmdline, boot_ok, Hi1102 init, firewall, status display"
 arch="noarch"
 url="https://github.com/hradaideh/p9lite-mainline"
 license="MIT"

@@ -4,7 +4,7 @@
 # vmlinuz is the stubbed Image (mkstub.py: real Image at 0x600000), modules include the Hi1102 driver.
 pkgname=linux-huawei-venus-mainline
 pkgver=7.3.1
-pkgrel=2
+pkgrel=3
 pkgdesc="Mainline Linux for Huawei P9 lite with p9test boot guard and Hi1102 Wi-Fi"
 arch="aarch64"
 url="https://github.com/hradaideh/p9lite-mainline"
@@ -23,5 +23,5 @@ package() {
 	cp -a mod/lib/modules "$pkgdir"/usr/lib/
 }
 sha512sums="
-42d904afd8ee73ada877d00c73a79d3282cbabdebd0ee1ebd7cb824c2002d5b4b6f2f529f21db2b976366d1d20cd47c0a19e0896107a74dcb5752d8d38f1161c  kernel-artifacts-7.3.1.tgz
+a4d43eb9805edd91459e27ab1c064585f33165ad22b7fbb105a41dccb7e8f3365af7219a7a9a37d82f9d775a887a05862b45a38b39dbbfad949dc9847c5519b5  kernel-artifacts-7.3.1.tgz
 "

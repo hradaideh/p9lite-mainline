@@ -712,6 +712,91 @@ static void __init p9_sdio_dt_prepare(void)
 }
 
 /* run time: clocks, reset release, Hi1102 power, then create + probe the SDIO host */
+/*
+ * microSD slot (dwmmc1 @ 0xFF37F000) for mainline dw_mmc-k3 (hi3660 flavour, as for SDIO).
+ * The bootloader leaves card power (PMIC LDO16 vmmc, LDO9 vqmmc, both 2.95 V), clk_sd/hclk_sd and
+ * the resets in a usable state, but not the clock source: clk_sd_muxsys points at the PLL path
+ * (ppll3 / 4), whose "AP" branch needs an LPM3 IPC request that mainline never sends.
+ * ponytail: run from clk_factor_mmc0 = 19.2 MHz / 6 = 3.2 MHz (always on; the vendor also uses it for
+ * the 400 kHz LEGACY mode). dw_mmc-k3 divides by 8, so the card clock is 400 kHz (~200 KB/s);
+ * enable a PLL branch via LPM3 for 25/50 MHz. No regulator/GPIO drivers bind here, so vmmc/vqmmc and
+ * cd-gpio are dropped and the core polls for the card (broken-cd).
+ * Node left disabled at boot; probe on demand: echo 1 > /sys/kernel/debug/p9test/sd
+ */
+#define P9_SD_NODE	"/dwmmc1@FF37F000"
+static void __init p9_sd_dt_prepare(void)
+{
+	static const char * const drop[] = { "vmmc-supply", "vqmmc-supply", "cd-gpio", "supports-highspeed" };
+	static const char * const flags[] = { "broken-cd", "disable-wp", "cap-sd-highspeed" };
+	struct device_node *np = of_find_node_by_path(P9_SD_NODE);
+	struct property *pp;
+	int i;
+
+	if (!np) {
+		pr_err("p9test: no %s node\n", P9_SD_NODE);
+		return;
+	}
+	p9_fixed_clk_for("clk_sd", 3200000);
+	p9_fixed_clk_for("hclk_sd", 120000000);
+	for (i = 0; i < ARRAY_SIZE(drop); i++) {
+		pp = of_find_property(np, drop[i], NULL);
+		if (pp)
+			of_remove_property(np, pp);
+	}
+	p9_set_prop_str(np, "compatible", "hisilicon,hi3660-dw-mshc");
+	p9_set_prop_str(np, "status", "disabled");
+	p9_set_prop_u32s(np, "bus-width", (const u32[]){ 4 }, 1);
+	p9_set_prop_u32s(np, "max-frequency", (const u32[]){ 3200000 }, 1);
+	for (i = 0; i < ARRAY_SIZE(flags); i++) {
+		struct property *p = kzalloc(sizeof(*p), GFP_KERNEL);
+
+		if (!p)
+			continue;
+		p->name = kstrdup(flags[i], GFP_KERNEL);
+		of_update_property(np, p);
+	}
+	pr_info("p9test: sd node prepared (disabled until 'echo 1 > /sys/kernel/debug/p9test/sd')\n");
+	of_node_put(np);
+}
+
+static int p9_sd_bringup(void)
+{
+	void __iomem *crg = ioremap(P9_PERI_CRG, 0x1000);
+	struct device_node *np;
+	struct platform_device *pdev = NULL;
+
+	if (!crg)
+		return -ENOMEM;
+	writel(0 | (BIT(6) << 16), crg + 0xb8);		/* clk_sd_muxsys = clk_factor_mmc0 (hiword mask) */
+	writel(BIT(17), crg + 0x40);			/* clk_sd  (PEREN4) */
+	writel(BIT(30), crg + 0x00);			/* hclk_sd (PEREN0) */
+	writel(BIT(18) | BIT(24), crg + 0x94);		/* RSTDIS4: SD controller + SD_M */
+	udelay(10);
+	pr_info("p9test: sd clk 0xb8=0x%08x PERSTAT4=0x%08x RSTSTAT4=0x%08x\n",
+		readl(crg + 0xb8), readl(crg + 0x4c), readl(crg + 0x98));
+	iounmap(crg);
+	np = of_find_node_by_path(P9_SD_NODE);
+	if (np) {
+		p9_set_prop_str(np, "status", "okay");
+		pdev = of_platform_device_create(np, NULL, NULL);
+		of_node_put(np);
+	}
+	pr_info("p9test: sd host device %s\n", pdev ? "created" : "FAILED");
+	p9_save_log();
+	return pdev ? 0 : -EIO;
+}
+
+static ssize_t p9_sd_write(struct file *f, const char __user *buf, size_t len, loff_t *off)
+{
+	int ret = p9_sd_bringup();
+
+	return ret ? ret : len;
+}
+
+static const struct file_operations p9_sd_fops = {
+	.write = p9_sd_write,
+};
+
 static int p9_sdio_bringup(void)
 {
 	void __iomem *crg = ioremap(P9_PERI_CRG, 0x1000);
@@ -869,6 +954,7 @@ static int __init p9test_early(void)
 	p9_fix_usb_dt();
 	if (sdio_prep)
 		p9_sdio_dt_prepare();
+	p9_sd_dt_prepare();
 	con_zone = p9_map_wc(P9_CON_PHYS, P9_CON_SIZE);
 	con_buf = vmalloc(P9_CON_SIZE);
 	wdt = ioremap(P9_WDT_BASE, 0x1000);
@@ -931,6 +1017,7 @@ static int __init p9test_late(void)
 		return 0;	/* only ever poke Hi6250 MMIO */
 	d = debugfs_create_dir("p9test", NULL);
 	debugfs_create_file("sdio", 0200, d, NULL, &p9_sdio_fops);
+	debugfs_create_file("sd", 0200, d, NULL, &p9_sd_fops);
 	INIT_DELAYED_WORK(&save_work, p9_save_fn);
 	INIT_DELAYED_WORK(&deadline_work, p9_deadline_fn);
 	if (save_periodic)
