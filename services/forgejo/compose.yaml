@@ -1,0 +1,18 @@
+# Forgejo on the P9 lite. Data (repos, sqlite db, LFS, config in gitea/conf/app.ini) lives on the
+# microSD at /mnt/sd/p9/forgejo, mounted by the p9-sd service; docker rc_needs p9-sd.
+# Web :3000, SSH :2222 (Forgejo's built-in SSH server, user git).
+#   sudo docker compose -f /srv/p9-forgejo/compose.yaml up -d
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:17.0.1
+    container_name: forgejo
+    restart: unless-stopped
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - /mnt/sd/p9/forgejo:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"
+      - "2222:2222"
