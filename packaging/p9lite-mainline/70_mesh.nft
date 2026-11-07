@@ -1,0 +1,16 @@
+# Cloudflare Mesh (WARP connector) subnet routing.
+# Mesh clients arrive on CloudflareWARP from 100.96.0.0/12. Forward them to the home
+# networks and masquerade behind the phone's address, so the router needs no
+# return route for 100.96.0.0/12.
+table inet filter {
+	chain forward {
+		iifname "CloudflareWARP" accept comment "Cloudflare Mesh clients to home networks"
+	}
+}
+
+table ip p9mesh_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 100.96.0.0/12 oifname "wlan0" masquerade comment "Mesh clients behind 192.168.2.50"
+	}
+}
