@@ -7,4 +7,6 @@ rc-update -q add p9-sd boot
 grep -q '^rc_need=' /etc/conf.d/docker 2>/dev/null || echo 'rc_need="p9-sd"' >> /etc/conf.d/docker
 # screen on hold: power the display path down at boot
 rc-update -q add p9-display-off default
+# hi6522 charging with the 80% limit (CV 4.15 V)
+rc-update -q add p9-charger default
 exit 0

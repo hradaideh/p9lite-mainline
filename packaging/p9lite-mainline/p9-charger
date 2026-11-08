@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""P9 lite, mainline: hi6522 charger control with an 80% charge limit.
+Mainline has no hi6522 charger driver, so charging stays disabled (ONFF1 chg_en=0) as the bootloader
+leaves it. This enables it with the vendor driver's own limits, except the battery regulation voltage:
+  CV 4.15 V  - this cell's OCV at 80% is 4.10-4.14 V (vendor DT coul pc_temp_ocv table); full = 4.39 V
+  recharge hysteresis 50 mV, termination 100 mA, fast charge 900 mA, input limit 1 A, DPM 4.6 V
+The limit is enforced by the charger hardware itself; the hi6522 watchdog stays disabled, so the settings
+hold even if this service stops. Every INTERVAL s the registers are checked and re-applied if they changed
+(e.g. after a USB replug). Status: /run/p9-charger.json, changes logged to stdout.
+  p9-charger            run (service)        p9-charger --once     apply once and exit
+Env: P9_CHG_CV_MV (default 4150), P9_CHG_INTERVAL (default 60)."""
+import json, os, subprocess, sys, time
+
+BUS, ADDR = "0", "0x6b"
+CV_MV = int(os.environ.get("P9_CHG_CV_MV", "4150"))
+INTERVAL = int(os.environ.get("P9_CHG_INTERVAL", "60"))
+assert 3800 <= CV_MV <= 4400, "CV outside 3.80-4.40 V"
+
+# (register, mask, value): hi6522 / SchargerV200 field layout from the vendor soc_scharger_interface.h
+FIELDS = [
+    (0x3A, 0xFF, 4 << 4 | 9),                        # BUCK_REG4: input limit 1 A, DPM 3880+9*80 = 4600 mV
+    (0x49, 0x1F, (900 - 100) // 100),                # CHG_REG1: fast charge 900 mA
+    (0x4A, 0x3F, ((CV_MV - 3800) // 50) << 2 | 1),   # CHG_REG2: CV, termination 100 mA
+    (0x4B, 0x70, 0 << 4),                            # CHG_REG3: recharge hysteresis 50 mV
+    (0x6B, 0x03, 0),                                 # SYS_SET_REG: chip watchdog off (settings persist)
+    (0x12, 0x10, 0x10),                              # ONFF1: chg_en_int = 1
+]
+
+def get(reg):
+    out = subprocess.run(["i2cget", "-f", "-y", BUS, ADDR, hex(reg)], capture_output=True, text=True).stdout.strip()
+    return int(out, 16) if out else None
+
+def put(reg, val):
+    subprocess.run(["i2cset", "-f", "-y", BUS, ADDR, hex(reg), hex(val)], check=True)
+
+def battery():
+    try:
+        uv, ua = (int(x) for x in open("/sys/module/p9test/parameters/battery").read().split()[:2])
+        return uv // 1000, ua // 1000
+    except Exception:
+        return None, None
+
+def apply():
+    changed = []
+    for reg, mask, val in FIELDS:
+        cur = get(reg)
+        if cur is None:
+            raise OSError("hi6522 not answering on i2c-%s" % BUS)
+        if cur & mask != val & mask:
+            put(reg, (cur & ~mask) | (val & mask))
+            changed.append("0x%02x %02x->%02x" % (reg, cur, (cur & ~mask) | (val & mask)))
+    return changed
+
+def status():
+    st0 = get(0x01) or 0
+    mv, ma = battery()
+    s = {"time": int(time.time()), "cv_mv": CV_MV, "charging": bool(st0 >> 5 & 3),
+         "chg_state": st0 >> 5 & 3, "vbat_mv": mv, "ibat_ma": ma,
+         "faults": {"status1": get(0x02), "status2": get(0x03), "status5": get(0x06)}}
+    tmp = "/run/.p9-charger.json"
+    with open(tmp, "w") as f:
+        json.dump(s, f)
+    os.replace(tmp, "/run/p9-charger.json")
+    return s
+
+def main():
+    once = "--once" in sys.argv
+    while True:
+        try:
+            changed = apply()
+            s = status()
+            if changed or once:
+                print("%s applied %s; vbat %s mV ibat %s mA chg_state %d" % (
+                    time.strftime("%F %T"), changed or "nothing (already set)", s["vbat_mv"], s["ibat_ma"],
+                    s["chg_state"]), flush=True)
+        except Exception as e:
+            print("%s error: %s" % (time.strftime("%F %T"), e), flush=True)
+        if once:
+            return
+        time.sleep(INTERVAL)
+
+if __name__ == "__main__":
+    main()

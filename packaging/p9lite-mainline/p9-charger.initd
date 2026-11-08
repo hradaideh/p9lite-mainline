@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+# hi6522 charger: enable charging with an 80% limit (CV 4.15 V). See /usr/local/bin/p9-charger.
+description="P9 lite charger control (80% charge limit)"
+command=/usr/bin/python3
+command_args="/usr/local/bin/p9-charger"
+command_background=true
+pidfile=/run/p9-charger.pid
+output_log=/var/log/p9-charger.log
+error_log=/var/log/p9-charger.log
+
+depend() {
+	need sysfs
+}

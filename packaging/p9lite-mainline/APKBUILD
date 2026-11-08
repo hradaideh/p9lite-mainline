@@ -2,7 +2,7 @@
 # Device-side configuration for running linux-huawei-venus-mainline under postmarketOS.
 pkgname=p9lite-mainline
 pkgver=1
-pkgrel=5
+pkgrel=6
 pkgdesc="P9 lite mainline config: boot, Wi-Fi, firewall, display, USB tether, microSD"
 arch="noarch"
 url="https://github.com/hradaideh/p9lite-mainline"
@@ -13,6 +13,7 @@ install="$pkgname.post-install $pkgname.post-upgrade"
 # ships /etc/init.d/hisi-wifi and p9-display on purpose (one small device package, no -openrc split)
 source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft
 	72_usb_tether.nft udhcpd-usb0.conf p9-usb-tether.initd p9-sd.initd 74_forgejo.nft
+	p9-charger p9-charger.initd
 	display/p9-display display/p9-hkadc display/p9-display.initd display/p9-display-off display/p9-display-off.initd display/p9-display.confd display/index.html"
 
 package() {
@@ -25,6 +26,8 @@ package() {
 	install -Dm644 "$srcdir"/udhcpd-usb0.conf "$pkgdir"/etc/udhcpd-usb0.conf
 	install -Dm755 "$srcdir"/p9-usb-tether.initd "$pkgdir"/etc/init.d/p9-usb-tether
 	install -Dm755 "$srcdir"/p9-sd.initd "$pkgdir"/etc/init.d/p9-sd
+	install -Dm755 "$srcdir"/p9-charger "$pkgdir"/usr/local/bin/p9-charger
+	install -Dm755 "$srcdir"/p9-charger.initd "$pkgdir"/etc/init.d/p9-charger
 	install -Dm644 "$srcdir"/74_forgejo.nft "$pkgdir"/etc/nftables.d/74_forgejo.nft
 	install -Dm755 "$srcdir"/p9-display "$pkgdir"/usr/local/bin/p9-display
 	install -Dm755 "$srcdir"/p9-hkadc "$pkgdir"/usr/local/bin/p9-hkadc
@@ -45,6 +48,8 @@ a718b6621ab093a667c822956237af99cb66daa0e8f80e78a89163725728d96a6a6bbb30d2a8fc5a
 f0a8f8c0a38c8d2df8aeb04f0a3c856cda39902218e88df6446100c80109e2853b084148e00ec939bd031f3dd4477dd31d0da46241c7da9e6d50ed12b343657e  p9-usb-tether.initd
 93098fcadb7b8ad8ac3d74978a944ef489726637aed53ee2e99c58e6156a353262181c47da5fcf07983c16bd4bbc6c4a7df2050300f66076fa1f7b7c1e1fa286  p9-sd.initd
 c0180c7b6dfb279f0e03270adb992a447c04bd0f0ac9d460a244dc01424fca7eda9b142b33be9bcc81558189b8afaadbbd1f38e3bb49896e104e171f844b8874  74_forgejo.nft
+5b8cd4bdb43f973486b19a36be654afd9d171649c733cf109ad4c44b32dcee60ff5d159b9f3bb64e6f3129dcb28def0961959441283934f5b033feccf705175c  p9-charger
+8c7b1988c483583e928416914b69b636e35145c6d35ad51bbf6a9671b0146f7905073bfbc967caf224a3234f1356de7648da036a2014f01786561d20512d6d25  p9-charger.initd
 89fafa9cfd0997365815e5d894181675ffc23e62f1cce1cd4a65415ed6da8725d7e923f9a48d7b9f678bdfc229cda94326f4f4dff1323584062beda29b10a098  p9-display
 ecadc71cf35d5ede52baf96f2d7a1957103e96599ec07bbe6b8c70d97cc5d785a7ac26a3d10181cbd6a6098df0b0f0f41878f152ffa1b3ab835868f13dfa0eff  p9-hkadc
 c8e666fbde38bd8408d761924200d03759bb4e8372f07a583b70526adcca0ac3d6b4cdc840e0805ff65bdfafc61e2f86228ce12b67f15742e18f7b593fa1ff0f  p9-display.initd
