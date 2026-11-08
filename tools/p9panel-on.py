@@ -43,8 +43,17 @@ backlight control on, but nothing is displayed. Findings:
   - What does differ: pipeline routing. 4.4 feeds the LDI from another read channel (MCTL_CTL0 +0x14/+0x30
     = 1, MCTL_SYS +0x160 = 0x102, OVL0 layer size 077f0437, RCH_D0 idle); the bootloader/mainline state
     uses RCH_D0 (MCTL_CTL0 +0x48 = 1, MCTL_SYS +0x178 = 0x102). LDI VSTATE 4 (4.4) vs 8 (mainline).
-  - Frame pixels do not use the DSI generic FIFO (LDI -> DSI eDPI), so the long-packet stall only
-    affects the 55 init commands, which already go out with a PHY restart per packet.
+  - Routing is not the problem: 4.4 happened to use RCH_V0 via the scaler; the bootloader's RCH_D0 -> OV0
+    path is valid (it shows the logo).
+  - On mainline the LDI sits in VSTATE 0x08 (VACTIVE0) from the first moment, horizontal state moving,
+    while all DSI lanes stay in stop state: the frame started but no pixel (long) packet ever goes out.
+    Pixels and init commands hit the same wall: the DSI host transmits no long payload.
+  - Refuted 2026-11-08: "a frame stuck in VACTIVE0 starves generic long packets". With the LDI stopped
+    (VSTATE -> IDLE) a DCS long write still does not take effect and the next one sticks in the payload
+    FIFO (tools/p9ldi-abort-test.py). Also refuted: SCTRL MMBUF/DSS AXI clocks (mainline has more on).
+  - Untested difference left: the D-PHY's internal test-code registers on a live 4.4 vs mainline (only
+    compared against the vendor source values so far). Readable through PHY_TST_CTRL0/1 with the safe
+    4.4 harness (tools/p9kp.py + gate-checked reads).
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
