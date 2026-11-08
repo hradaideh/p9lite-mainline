@@ -13,5 +13,5 @@ depend() {
 }
 
 start_pre() {
-	export P9_BRIGHTNESS P9_INTERVAL
+	export P9_BRIGHTNESS P9_INTERVAL P9_DSS
 }

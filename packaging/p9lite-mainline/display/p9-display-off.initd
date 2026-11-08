@@ -1,0 +1,14 @@
+#!/sbin/openrc-run
+# Screen work is on hold: power the display path down at boot (panel, backlight, DSS, LPM3 domains).
+description="P9 lite: display hardware off"
+
+depend() {
+	need sysfs
+	before p9-display
+}
+
+start() {
+	ebegin "Powering the display path down"
+	/usr/local/bin/p9-display-off >/dev/null
+	eend $?
+}

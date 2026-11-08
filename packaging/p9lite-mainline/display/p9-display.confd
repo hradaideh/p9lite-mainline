@@ -3,3 +3,6 @@
 P9_BRIGHTNESS=60
 # Seconds between screen refreshes
 P9_INTERVAL=10
+# 0: do not drive the panel through the bootloader DSS buffer (screen on hold, display powered off
+# by p9-display-off); the web status page is still published.
+P9_DSS=0
