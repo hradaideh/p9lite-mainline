@@ -7,6 +7,7 @@ leaves it. This enables it with the vendor driver's own limits, except the batte
 The limit is enforced by the charger hardware itself; the hi6522 watchdog stays disabled, so the settings
 hold even if this service stops. Every INTERVAL s the registers are checked and re-applied if they changed
 (e.g. after a USB replug). Status: /run/p9-charger.json, changes logged to stdout.
+Battery current from /sys/module/p9test/parameters/battery (Hi6555 gauge): positive = discharging.
   p9-charger            run (service)        p9-charger --once     apply once and exit
 Env: P9_CHG_CV_MV (default 4150), P9_CHG_INTERVAL (default 60)."""
 import json, os, subprocess, sys, time

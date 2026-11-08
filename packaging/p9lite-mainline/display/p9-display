@@ -191,16 +191,21 @@ def battery():
     except Exception:
         return None, '?', False, 0, None, None
     mv = uv // 1000
-    pct = max(0, min(100, round((mv - 3400) * 100 / (4350 - 3400))))   # rough Li-ion voltage curve
-    ma = ua // 1000
-    if ma > 20: bst = 'CHARGING'
-    elif mv >= 4300: bst = 'FULL'
-    else: bst = 'DISCHARGING'
+    pct = max(0, min(100, round((mv - 3400) * 100 / (4390 - 3400))))   # rough Li-ion curve; full = 4.39 V
+    ma = -(ua // 1000)                    # Hi6555 gauge: positive = discharging -> make charging positive
+    try:   # hi6522 STATUS0 bits 5-6 (chg_chgstate): 0 idle, 1 pre-charge, 2 fast charge, 3 done
+        st = (int(subprocess.run(['i2cget', '-f', '-y', '0', '0x6b', '0x01'], capture_output=True,
+                                 text=True, timeout=3).stdout, 16) >> 5) & 3
+    except Exception:
+        st = None
+    if st in (1, 2) and ma > 0: bst = 'CHARGING'
+    elif ma < -20: bst = 'DISCHARGING'
+    else: bst = 'IDLE (80% LIMIT)' if mv >= 4080 else 'IDLE'
     try:   # battery NTC via LPM3 HKADC (p9-hkadc, /dev/mem mailbox); None if LPM3 does not answer
         temp = float(subprocess.run(['/usr/local/bin/p9-hkadc'], capture_output=True, text=True, timeout=5).stdout)
     except Exception:
         temp = None
-    return pct, bst, mv >= 4300 or ma > 20, abs(ma), temp, mv
+    return pct, bst, ma > -20, abs(ma), temp, mv
 
 def disk(path='/'):
     """(used, usable) GB like df: ext4's reserved blocks count as neither used nor available."""
