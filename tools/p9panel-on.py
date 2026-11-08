@@ -59,6 +59,14 @@ backlight control on, but nothing is displayed. Findings:
     gate check covered DSS/LDI/pclk_dsi0 but not clk_txdphy0_cfg/ref (PERSTAT3 bits 28/29), which hisifb
     gates when idle and which the PHY test interface needs. Fixed in the tool; not retried yet. Pushing a
     frame may not keep the PHY cfg clock on long enough - check that first with CRG reads only.
+  - 2026-11-08 structured pass, all refuted on mainline: LDI stopped then DSI host+PHY reset (with and
+    without PERI_CTRL23 bit3), LDI/DSS routing, ULPS (all lanes in stop state, none in ULPS), D-PHY test
+    codes (identical, all 4 lanes), PHY ref/cfg clocks (19.2 MHz crystal, gates on), pixel/core clocks
+    (PPLL0 144/360 MHz both kernels), DSS GLB clock enables, PCTRL DSI bits, SCTRL MMBUF/AXI clocks.
+    Static state is identical to working 4.4; the difference is in the power-on sequence itself (4.4
+    power-cycles and re-inits DSS+DSI+panel in C with exact timing on every fb open), which register
+    dumps cannot capture. Decision point: port the vendor hisifb power-on path (dpe_on -> mipi_dsi_on ->
+    panel on -> single_frame_update) into the kernel, as was done for the Hi1102 Wi-Fi driver.
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
