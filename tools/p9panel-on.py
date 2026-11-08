@@ -34,6 +34,17 @@ backlight control on, but nothing is displayed. Findings:
   - r16 (4.4) has no /dev/mem, no modules, no kprobes: a register diff needs a 4.4 build with
     CONFIG_DEVMEM (vendor tree in p9build /work/vendor, or the Deck pmbootstrap setup).
     Fresh 7.3.1 bootloader-state dump: k7/logs/dss-dump-7.3.1-fresh.txt (tools/p9dss-dump.py).
+  - 2026-11-08 register diff, vendor 4.4 (working panel) vs 7.3.1 fresh: k7/logs/dss-dump-4.4-working.txt
+    (captured with tools/p9dss-live.py: hisifb idle-gates the DSS clocks, and a blind read of a gated
+    block hangs the SoC). DSI0 host config, LDI0 config, panel pinmux, PCTRL DSS bits and the display
+    clock dividers are IDENTICAL. So static config is not the blocker; the difference is procedural.
+  - CORRECTION: GPIO021 is muxed to function 2 (DSS TE input) on both kernels, so the GPIO data register
+    never shows TE. "TE never toggles" above was a measurement error - judge TE from LDI status instead.
+  - What does differ: pipeline routing. 4.4 feeds the LDI from another read channel (MCTL_CTL0 +0x14/+0x30
+    = 1, MCTL_SYS +0x160 = 0x102, OVL0 layer size 077f0437, RCH_D0 idle); the bootloader/mainline state
+    uses RCH_D0 (MCTL_CTL0 +0x48 = 1, MCTL_SYS +0x178 = 0x102). LDI VSTATE 4 (4.4) vs 8 (mainline).
+  - Frame pixels do not use the DSI generic FIFO (LDI -> DSI eDPI), so the long-packet stall only
+    affects the 55 init commands, which already go out with a PHY restart per packet.
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """

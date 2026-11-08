@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Dump the display-path registers (DSS blocks the vendor hisifb programs, DSI0, PCTRL, CRG, SCTRL,
 LCD pins) as 'addr value' lines, for diffing a working vendor-4.4 boot against mainline.
-Read-only. Run as root on the phone:  p9dss-dump.py > dump.txt"""
-import mmap, os, struct
+Read-only. Run as root on the phone:  p9dss-dump.py > dump.txt
+A clock-gated block raises SIGBUS, so each range is read in a child process; failed ranges print
+"# range <base> unreadable"."""
+import mmap, os, struct, sys
 
 DSS = 0xE8600000
 RANGES = [  # (base, length)
@@ -27,9 +29,23 @@ RANGES = [  # (base, length)
 
 fd = os.open("/dev/mem", os.O_RDONLY | os.O_SYNC)
 for base, length in RANGES:
-    page = base & ~0xFFF
-    span = ((base + length - page + 0xFFF) & ~0xFFF)
-    m = mmap.mmap(fd, span, mmap.MAP_SHARED, mmap.PROT_READ, offset=page)
-    for a in range(base, base + length, 4):
-        print("%08x %08x" % (a, struct.unpack_from("<I", m, a - page)[0]))
-    m.close()
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.close(r)
+        page = base & ~0xFFF
+        span = ((base + length - page + 0xFFF) & ~0xFFF)
+        m = mmap.mmap(fd, span, mmap.MAP_SHARED, mmap.PROT_READ, offset=page)
+        out = "".join("%08x %08x\n" % (a, struct.unpack_from("<I", m, a - page)[0])
+                      for a in range(base, base + length, 4))
+        os.write(w, out.encode()); os._exit(0)
+    os.close(w)
+    data = b""
+    while True:
+        chunk = os.read(r, 65536)
+        if not chunk:
+            break
+        data += chunk
+    os.close(r)
+    _, st = os.waitpid(pid, 0)
+    sys.stdout.write(data.decode() if st == 0 else "# range %08x unreadable\n" % base)
