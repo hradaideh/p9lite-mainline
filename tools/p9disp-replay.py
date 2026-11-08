@@ -18,7 +18,10 @@ PANEL_PINS = {0x30, 0x44, 0x48, 0x54, 0x83c, 0x850, 0x854, 0x860}
 CRG_KEEP = {0x00: 0x10000, 0x30: None, 0x50: None, 0xf0: None, 0xf8: None, 0x88: None}
 def keep(a, v):
     if 0xE8600000 <= a < 0xE8680000:
-        return ((a - 0xE8600000) & ~0xfff) not in (0x2000, 0x8000, 0xA000)   # cmdlist, SMMU, MIF
+        blk = (a - 0xE8600000) & ~0xfff
+        if "--dsi-only" in sys.argv:          # keep the bootloader's pipeline (RCH/OVL/DBUF/MCTL/DPP) untouched
+            return blk in (0x1000, 0x7D000) or (blk == 0 and a - 0xE8600000 in (0x100, 0x104, 0x108, 0x10c, 0x110))
+        return blk not in (0x2000, 0x8000, 0xA000)   # cmdlist, SMMU, MIF
     if 0xE8A0D000 <= a < 0xE8A0E000 or a in (0xE8A09400, 0xE8A09404):        # GPIO bank 2 (panel), its lock
         return True
     if 0xE896C000 <= a < 0xE896D000:
@@ -28,6 +31,14 @@ def keep(a, v):
         return o in CRG_KEEP and (CRG_KEEP[o] is None or CRG_KEEP[o] == v)
     return a in (0xFFF0A258, 0xFFF0A170)
 seq = [r for r in trace if any(lo <= r[0] <= hi for lo, hi in WIN) and keep(r[1], r[3])]
+if "--hs-cmds" in sys.argv:
+    # mainline: LP transmission does not drain, so blind-queued LP commands overflow the payload FIFO and
+    # shift every later command onto the wrong data. Run mipi_dsi_on_sub2 (HS + clock lane) first.
+    SUB2 = (14042907, 14042911)
+    sub2 = [r for r in seq if SUB2[0] <= r[0] <= SUB2[1]]
+    seq = [r for r in seq if not SUB2[0] <= r[0] <= SUB2[1]]
+    first_cmd = min(r[0] for r in seq if r[1] in (0xE8601070, 0xE860106C) and r[0] > 13.8e6)
+    seq += [(first_cmd - 100 + i, a, s_, v) for i, (t, a, s_, v) in enumerate(sub2)]
 # panel rails: hi6522 (i2c-0, 0x6b) reg 0x11, as 4.4 does (decoded from the trace's I2C writes)
 RAIL = 0xFFFFFFF0
 if "--i2c-raw" in sys.argv:   # no i2c-dev (vendor 4.4): replay the vendor's own DesignWare I2C register writes
@@ -120,7 +131,7 @@ for t, a, s, v in seq:
         while not (r(0xE8601074) & 1 and r(0xE8601074) & 4) and time.time() - t0 < 0.1:
             time.sleep(0.0002)
         st = r(0xE8601074)
-        if not (st & 1 and st & 4) and "--check" in sys.argv:
+        if not (st & 1 and st & 4) and ("--check" in sys.argv or "--hs-cmds" in sys.argv):
             print("STALL at panel cmd %d: hdr=%08x (dtype %02x len %d) pld=%s PKT_STATUS=%08x PHY_STATUS=%08x" % (
                 ncmd, v, v & 0x3f, v >> 8 & 0xffff, [hex(x) for x in pld], st, r(0xE86010B0)))
             break

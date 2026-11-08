@@ -9,7 +9,7 @@ fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
 m = mmap.mmap(fd, 0x80000, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DSS)
 rd = lambda o: struct.unpack_from("<I", m, o)[0]
 wr = lambda o, v: struct.pack_into("<I", m, o, v)
-dump = {int(a, 16): int(v, 16) for a, v in (l.split() for l in open(sys.argv[1]) if re.match(r"^[0-9a-f]{8} [0-9a-f]{8}$", l.strip()))}
+dump = {} if sys.argv[1] == "-" else {int(a, 16): int(v, 16) for a, v in (l.split() for l in open(sys.argv[1]) if re.match(r"^[0-9a-f]{8} [0-9a-f]{8}$", l.strip()))}
 secs = float(sys.argv[2]) if len(sys.argv) > 2 else 120
 
 fbm = mmap.mmap(fd, STRIDE * H, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=FB)
@@ -21,6 +21,8 @@ for i, px in enumerate(bands):
 print("framebuffer painted: red / green / blue / white bands")
 
 MCTL_SYS, CTL0, LDI = 0x10000, 0x10800, 0x7D000
+if "--no-restore" in sys.argv:
+    dump = {}
 wr(CTL0 + 0x04, 1)                                          # MCTL_CTL_MUTEX lock
 for lo, n in ((0xA000, 0x100), (0x10000, 0x200), (0x10800, 0x100), (0x50000, 0x200), (0x60000, 0x200),
               (0x6D000, 0x100), (0x70000, 0x200)):
@@ -28,9 +30,10 @@ for lo, n in ((0xA000, 0x100), (0x10000, 0x200), (0x10800, 0x100), (0x50000, 0x2
         a = DSS + o
         if a in dump and o not in (CTL0 + 0x04, CTL0 + 0x08, CTL0 + 0x58):   # not mutex/status/clear
             wr(o, dump[a])
-wr(0x70000 + 0x10, 0)                                       # DPP colour bar off
-wr(MCTL_SYS + 0x118, 1)                                     # MCTL_RCH6_FLUSH_EN (RCH_D0)
-wr(MCTL_SYS + 0x128, 1)                                     # MCTL_OV0_FLUSH_EN
+if dump:
+    wr(0x70000 + 0x10, 0)                                   # DPP colour bar off
+    wr(MCTL_SYS + 0x118, 1)                                 # MCTL_RCH6_FLUSH_EN (RCH_D0)
+    wr(MCTL_SYS + 0x128, 1)                                 # MCTL_OV0_FLUSH_EN
 wr(CTL0 + 0x04, 0)                                          # unlock -> shadow registers take effect
 print("pipeline restored: RCH_D0 addr=%08x stride=%x OVL0 size=%08x MCTL_RCH_OV0_SEL=%08x" % (
     rd(0x50060), rd(0x50064), rd(0x6003c) if rd(0x6003c) else rd(0x60000), rd(MCTL_SYS + 0x180)))

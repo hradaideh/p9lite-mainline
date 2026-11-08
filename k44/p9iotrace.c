@@ -75,6 +75,29 @@ void p9_iotrace(u32 val, const volatile void __iomem *addr, u8 size)
 }
 EXPORT_SYMBOL(p9_iotrace);
 
+/* reads (logged with size | 0x80): only the DSI host, LDI0 and PCTRL, where a read can change hardware state */
+void p9_iotrace_rd(u32 val, const volatile void __iomem *addr, u8 size)
+{
+	unsigned long va = (unsigned long)addr;
+	u32 phys;
+	int idx;
+
+	if (!is_vmalloc_addr((const void *)va))
+		return;
+	phys = (u32)((vmalloc_to_pfn((const void *)va) << PAGE_SHIFT) | (va & ~PAGE_MASK));
+	if (!((phys >= 0xE8601000 && phys < 0xE8602000) || (phys >= 0xE867D000 && phys < 0xE867E000) ||
+	      (phys >= 0xE8A09000 && phys < 0xE8A0A000)))
+		return;
+	idx = atomic_inc_return(&p9_trace_idx) - 1;
+	if (idx >= P9_TRACE_N)
+		return;
+	p9_trace[idx].ns = ktime_get_ns() - p9_trace_t0;
+	p9_trace[idx].phys = phys;
+	p9_trace[idx].val = val;
+	p9_trace[idx].size = size | 0x80;
+}
+EXPORT_SYMBOL(p9_iotrace_rd);
+
 static int p9_on_set(const char *s, const struct kernel_param *kp)
 {
 	int ret = param_set_int(s, kp);

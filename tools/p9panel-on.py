@@ -80,6 +80,17 @@ backlight control on, but nothing is displayed. Findings:
     vendor driver does that a write trace cannot show (reads/polls that gate the next step, or
     conditional logic). Static state and all recorded writes are equal; this is now a sequencing
     problem inside mipi_dsi_on/panel_on, best solved by porting that C path, not by replay.
+  - 2026-11-08 later: the replay window had stopped right before mipi_dsi_on_sub2 and the stall check
+    broke at cmd 2 - with both fixed, the panel answers 0x0A=9C/0x0F=C0 and frames run on TE (60/s).
+    Backlight: bl-type BL_SET_BY_MIPI, LEDs from hi6522 schg_boost2 (ONFF1 bit2); toggling it shows
+    NOTHING on mainline - the screen never lit, so all "black" results say nothing about pixels.
+    LPM3 dsssubsys power cycle makes MCTL/RCH secure-only (vendor reopens via ATF SMC 0xc500aa01);
+    use --no-lpm3 --dsi-only on a fresh boot to keep the bootloader pipeline (RCH_D0 -> FB 0x0B000000).
+    DECISIVE: the identical corrected replay DRAINS the LP command FIFO on vendor 4.4 (PKT_STATUS 0x15,
+    also 0x55 in the read trace) but never on mainline (payload FIFO overflows -> shifted commands).
+    So the remaining cause is environmental (outside DSI/LDI/GLB/PCTRL/CRG/SCTRL/PMCTRL/PMU, all
+    diffed): candidates are things only the vendor kernel sets up (NoC/QoS, DSS-internal secure state
+    via ATF, LPM3 votes other than dsssubsys/vivobus/mmbuf/PPLL3).
   - Do NOT read the D-PHY test interface on 4.4 with p9dphy-read.py --live: it crashed the SoC twice.
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
