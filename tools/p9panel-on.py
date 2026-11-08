@@ -54,6 +54,11 @@ backlight control on, but nothing is displayed. Findings:
   - Untested difference left: the D-PHY's internal test-code registers on a live 4.4 vs mainline (only
     compared against the vendor source values so far). Readable through PHY_TST_CTRL0/1 with the safe
     4.4 harness (tools/p9kp.py + gate-checked reads).
+    Attempt 2026-11-08: tools/p9dphy-read.py read all 256 codes on mainline (k7/logs/dphy-7.3.1.txt), but on
+    4.4 it hit SIGBUS and the SoC hung shortly after (keypoint 250 -> plain reboot, no eRecovery). Cause: the
+    gate check covered DSS/LDI/pclk_dsi0 but not clk_txdphy0_cfg/ref (PERSTAT3 bits 28/29), which hisifb
+    gates when idle and which the PHY test interface needs. Fixed in the tool; not retried yet. Pushing a
+    frame may not keep the PHY cfg clock on long enough - check that first with CRG reads only.
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
