@@ -9,7 +9,7 @@ The hisifb driver powers the panel on when /dev/fb0 is opened and OFF when it is
 so this daemon keeps the fd open for its whole life. Never call FBIOBLANK here: on top
 of the open-triggered power-on it crashed the phone (watchdog reset).
 """
-import fcntl, mmap, os, signal, socket, struct, subprocess, sys, time, urllib.request
+import fcntl, json, mmap, os, signal, socket, struct, subprocess, sys, time, urllib.request
 
 W, H, STRIDE = 1080, 1920, 4320
 S = 6                       # physical pixels per logical pixel
@@ -207,6 +207,21 @@ def battery():
         temp = None
     return pct, bst, ma > -20, abs(ma), temp, mv
 
+CHG_STATES = {0: 'Idle', 1: 'Pre-charge', 2: 'Fast charge', 3: 'Done'}
+
+def charger():
+    """p9-charger status (/run/p9-charger.json) + the supervised discharge (tools/p9-discharge.py) if any."""
+    try:
+        c = json.loads(rd('/run/p9-charger.json', '{}') or '{}')
+    except ValueError:
+        c = {}
+    log = [l for l in rd('/var/log/p9-discharge.log', '').splitlines() if l.strip()]
+    running = subprocess.run(['pgrep', '-f', 'p9-discharge.py'], capture_output=True).returncode == 0
+    svc = os.path.exists('/run/p9-charger.pid') and os.path.exists('/proc/' + rd('/run/p9-charger.pid', 'x').strip())
+    return {'limit_pct': 80, 'cv_mv': c.get('cv_mv'), 'state': CHG_STATES.get(c.get('chg_state'), '?'),
+            'service': svc, 'checked': c.get('time'),
+            'discharge': {'running': running, 'last': log[-1][20:] if log else None}}
+
 def disk(path='/'):
     """(used, usable) GB like df: ext4's reserved blocks count as neither used nor available."""
     s = os.statvfs(path)
@@ -254,8 +269,11 @@ def render(cv, tick):
     t = int(tz) / 1000 if tz.lstrip('-').isdigit() else None
     bpct, bst, ext, cur, btemp, bmv = battery()
     bat = str(bpct) if bpct is not None else '?'
+    chg = charger()
     if bst == 'CHARGING': blabel, bcol = 'CHARGING', 3
-    elif bst == 'FULL' or (ext and bst != 'DISCHARGING'): blabel, bcol = 'FULL PLUGGED', 3
+    elif chg['discharge']['running']: blabel, bcol = 'DISCHARGING TO 80%', None
+    elif bst.startswith('IDLE (80%'): blabel, bcol = 'AT 80% LIMIT', 3
+    elif ext and bst != 'DISCHARGING': blabel, bcol = 'PLUGGED', 3
     else: blabel, bcol = 'ON BATTERY', None
     bval = f'{bat}% {blabel} {cur}MA' if len(f'{bat}% {blabel} {cur}MA') <= 23 else f'{bat}% {blabel}'
     if bmv: bval = f'{bmv}MV {blabel}'[:23]
@@ -274,6 +292,8 @@ def render(cv, tick):
             'battery': {'pct': int(bat) if bat.isdigit() else None, 'status': bst,
                         'state': blabel, 'external_power': ext, 'current_ma': cur,
                         'temp_c': btemp, 'voltage_mv': bmv},
+            'charger': chg,
+            'screen': 'off (on hold)' if os.environ.get('P9_DSS', '1') != '1' and not os.path.exists('/dev/fb0') else 'on',
             'services': {}}
     rows = [('CPU', f'{c:4.1f}%', c / 100),
             ('RAM', f'{used}/{m["MemTotal"]}M', used / m['MemTotal']),

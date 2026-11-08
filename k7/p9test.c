@@ -682,7 +682,10 @@ static void __init p9_sdio_dt_prepare(void)
 {
 	struct device_node *np;
 
-	p9_fixed_clk_for("clk_sdio0", 3200000);	/* clk_factor_mmc0: 19.2 MHz / 6 */
+	/* PLL path, as for the microSD slot: clk_sdio0_muxpl = ppll3 (1.6 GHz) / 4 = 400 MHz; dw_mmc-k3
+	 * divides by 8 -> 50 MHz bus_hz. The rate must be real (dw_mmc derives timeouts from it). The old
+	 * 3.2 MHz factor clock gave a 400 kHz SDIO bus: Wi-Fi ~26 KB/s, Home Assistant pages took minutes. */
+	p9_fixed_clk_for("clk_sdio0", 400000000);
 	p9_fixed_clk_for("hclk_sdio0", 120000000);
 	np = of_find_node_by_path("/dwmmc2@ff37d000");
 	if (!np) {
@@ -692,10 +695,10 @@ static void __init p9_sdio_dt_prepare(void)
 	p9_set_prop_str(np, "compatible", "hisilicon,hi3660-dw-mshc");	/* writes the vendor GPIO reg: CLK_ENABLE + div */
 	p9_set_prop_str(np, "status", "disabled");
 	p9_set_prop_u32s(np, "bus-width", (const u32[]){ 4 }, 1);
-	p9_set_prop_u32s(np, "max-frequency", (const u32[]){ 3200000 }, 1);
+	p9_set_prop_u32s(np, "max-frequency", (const u32[]){ 50000000 }, 1);
 	{
 		static const char * const flags[] = { "non-removable", "cap-sdio-irq",
-						      "keep-power-in-suspend", "p9,ocr-1v8" };
+						      "keep-power-in-suspend", "p9,ocr-1v8", "cap-sd-highspeed" };
 		int i;
 
 		for (i = 0; i < ARRAY_SIZE(flags); i++) {
@@ -812,13 +815,10 @@ static int p9_sdio_bringup(void)
 
 	if (!crg || !pmu || !gp || !gx)
 		goto out;
-	pr_info("p9test: sdio step 1: clocks (div 16 -> 100 MHz) and gates\n");
-	writel((15 << 7) | (0x780 << 16), crg + 0xb8);
-	/* clk_sdio0_muxsy (bit 13) -> clkdiv_sdio0 (r16 does this); muxpl (bits 12:11) = 0 ->
-	 * clk_ap_ppll0 1.44 GHz, which is running (ppll3 used by r16 may be off here) */
-	/* muxsy = 0 -> clk_factor_mmc0 = 19.2 MHz / 6 = 3.2 MHz (always running). The
-	 * clkdiv path needs the ppll "AP" branch (hisilicon,ppll-ctrl), which is off here. */
-	writel(0 | (BIT(13) << 16), crg + 0xb8);
+	pr_info("p9test: sdio step 1: clocks (ppll3 / 4 = 400 MHz) and gates\n");
+	/* muxpl (bits 12:11) = 3 -> ppll3, div (bits 10:7) = 3 -> /4 = 400 MHz, then muxsy (bit 13) = PLL path */
+	writel((0x1f80 << 16) | (3 << 11) | (3 << 7), crg + 0xb8);
+	writel(BIT(13) | (BIT(13) << 16), crg + 0xb8);
 	pr_info("p9test: sdio clk reg 0xb8 = 0x%08x (div=%u muxsy=%u muxpl=%u)\n",
 		readl(crg + 0xb8), ((readl(crg + 0xb8) >> 7) & 0xf) + 1,
 		!!(readl(crg + 0xb8) & BIT(13)), (readl(crg + 0xb8) >> 11) & 3);

@@ -74,7 +74,10 @@
           <dt>Current</dt><dd id="bcur">–</dd>
           <dt>Voltage</dt><dd id="bvolt">–</dd>
           <dt>Battery temp</dt><dd id="btemp">–</dd>
-          <dt>Charger</dt><dd id="bext">–</dd>
+          <dt>USB power</dt><dd id="bext">–</dd>
+          <dt>Charge limit</dt><dd id="climit">–</dd>
+          <dt>Charger</dt><dd id="cstate">–</dd>
+          <dt>Discharge</dt><dd id="cdis">–</dd>
         </dl>
       </section>
 
@@ -106,9 +109,9 @@
     </div>
 
     <aside class="screen card">
-      <h2>Phone screen</h2>
+      <h2>Phone screen <span class="sub" id="scr"></span></h2>
       <img id="shot" src="screen.png" alt="Live copy of the phone's LCD dashboard">
-      <p>Same frame the LCD is showing, refreshed every 10 s</p>
+      <p id="scrnote">Same frame the LCD is showing, refreshed every 10 s</p>
     </aside>
   </div>
 </main>
@@ -129,7 +132,8 @@ function render(d) {
   $('host').textContent = d.hostname;
   $('uptime').textContent = d.uptime.toLowerCase();
   const b = d.battery;
-  const battColor = b.state === 'ON BATTERY' ? (b.pct > 30 ? 'var(--warn)' : 'var(--bad)') : 'var(--ok)';
+  const onBatt = b.state === 'ON BATTERY' || b.state.startsWith('DISCHARGING');
+  const battColor = onBatt ? (b.pct > 30 ? 'var(--warn)' : 'var(--bad)') : 'var(--ok)';
   $('metrics').innerHTML =
     metric('CPU', d.cpu_pct.toFixed(1) + '%', d.cpu_pct) +
     metric('Memory', `${d.ram_mb.used} / ${d.ram_mb.total} MB`, pct(d.ram_mb.used, d.ram_mb.total)) +
@@ -144,11 +148,19 @@ function render(d) {
   $('bpct').textContent = (b.pct ?? '?') + '%';
   $('bstate').textContent = b.state.charAt(0) + b.state.slice(1).toLowerCase();
   $('bstate').style.color = battColor;
-  $('bcur').textContent = `${b.current_ma} mA ${b.state === 'CHARGING' ? 'in' : b.state === 'ON BATTERY' ? 'out' : ''}`.trim();
+  $('bcur').textContent = `${b.current_ma} mA ${b.state === 'CHARGING' ? 'in' : onBatt ? 'out' : ''}`.trim();
   $('bvolt').textContent = b.voltage_mv ? (b.voltage_mv / 1000).toFixed(2) + ' V' : '–';
   $('btemp').textContent = b.temp_c == null ? '–' : b.temp_c.toFixed(1) + ' °C';
-  $('bext').textContent = b.external_power ? 'Connected' : 'Not connected';
+  $('bext').textContent = b.external_power ? 'Connected' : (b.state.startsWith('DISCHARGING') ? 'Limited to 100 mA (discharge)' : 'Not connected');
+  const c = d.charger || {};
+  $('climit').textContent = c.cv_mv ? `${c.limit_pct}% (${(c.cv_mv / 1000).toFixed(2)} V, held by the hi6522)` : '–';
+  $('cstate').textContent = `${c.state || '?'} · service ${c.service ? 'running' : 'paused'}`;
+  $('cdis').textContent = c.discharge ? (c.discharge.running ? 'running: ' : 'last: ') + (c.discharge.last || 'none') : '–';
 
+  if (d.screen && d.screen !== 'on') {
+    $('scr').textContent = '· LCD ' + d.screen;
+    $('scrnote').textContent = 'The LCD is powered off (mainline display work on hold); this is the dashboard frame it would show, refreshed every 10 s';
+  }
   $('ssid').textContent = `${d.wifi.ssid} (${d.wifi.state.toLowerCase()})`;
   $('rssi').textContent = d.wifi.rssi_dbm + ' dBm';
   $('ip').textContent = d.wifi.ip;
