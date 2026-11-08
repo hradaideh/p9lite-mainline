@@ -13,7 +13,7 @@ import p9lpm3
 
 trace = [l.split() for l in open(sys.argv[1]) if not l.startswith("#")]
 trace = [(int(t), int(a, 16), int(s), int(v, 16)) for t, a, s, v in trace]
-WIN = [(8.79e6, 9.12e6), (13.85e6, 14.042e6)]
+WIN = [(8.79e6, 9.12e6), (13.85e6, 14042950)]   # through mipi_dsi_on_sub2 (HS + LPCLK_CTRL=3), before the first-frame SMMU/cmdlist
 PANEL_PINS = {0x30, 0x44, 0x48, 0x54, 0x83c, 0x850, 0x854, 0x860}
 CRG_KEEP = {0x00: 0x10000, 0x30: None, 0x50: None, 0xf0: None, 0xf8: None, 0x88: None}
 def keep(a, v):
@@ -92,7 +92,7 @@ ncmd, pld = 0, []
 for t, a, s, v in seq:
     gap = (t - prev) / 1e6
     if gap > 20e-6:
-        time.sleep(min(gap, 0.2))
+        time.sleep(min(gap, float(os.environ.get("P9_GAP_CAP", "0.2"))))
     prev = t
     if a == RAIL:
         rail(v); continue
@@ -115,7 +115,7 @@ for t, a, s, v in seq:
         while not (r(0xE8601074) & 1 and r(0xE8601074) & 4) and time.time() - t0 < 0.1:
             time.sleep(0.0002)
         st = r(0xE8601074)
-        if not (st & 1 and st & 4):
+        if not (st & 1 and st & 4) and "--check" in sys.argv:
             print("STALL at panel cmd %d: hdr=%08x (dtype %02x len %d) pld=%s PKT_STATUS=%08x PHY_STATUS=%08x" % (
                 ncmd, v, v & 0x3f, v >> 8 & 0xffff, [hex(x) for x in pld], st, r(0xE86010B0)))
             break
@@ -123,4 +123,9 @@ for t, a, s, v in seq:
 time.sleep(0.05)
 print("after:  LDI VSTATE=%03x DSI PKT_STATUS=%08x PHY_STATUS=%08x INT_ST0=%08x INT_ST1=%08x RSTSTAT3=%08x" % (
     r(LDI + 0x54), r(0xE8601074), r(0xE86010B0), r(0xE86010BC), r(0xE86010C0), r(0xFFF3508C)))
+for i in range(20):                       # queue should drain now that the HS clock runs
+    if r(0xE8601074) & 1 and r(0xE8601074) & 4:
+        break
+    time.sleep(0.05)
+print("FIFO drained" if r(0xE8601074) & 5 == 5 else "FIFO NOT drained", "PKT_STATUS=%08x" % r(0xE8601074))
 print("panel: power mode 0x0A=%s signal 0x0E=%s brightness 0x52=%s" % (p.dcs_read(0x0A), p.dcs_read(0x0E), p.dcs_read(0x52)))
