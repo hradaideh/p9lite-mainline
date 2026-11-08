@@ -1,0 +1,72 @@
+# Reference: <https://postmarketos.org/vendorkernel>
+# Kernel config based on: arch/arm64/configs/merge_hi6250_defconfig
+
+pkgname=linux-huawei-venus
+pkgver=4.1.18
+pkgrel=16
+pkgdesc="Huawei P9 lite kernel fork"
+arch="aarch64"
+_carch="arm64"
+_flavor="huawei-venus"
+url="https://kernel.org"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps pmb:cross-native"
+makedepends="
+	bash
+	bc
+	bison
+	devicepkg-dev
+	flex
+	openssl-dev
+	perl
+"
+
+# Source
+_repository="android_kernel_huawei_vns"
+_commit="c93d7f0aedb5c5ea608a891a530979976d537998"
+_config="config-$_flavor.$arch"
+source="
+	$pkgname-$_commit.tar.gz::https://github.com/Huawei-Dev/$_repository/archive/$_commit.tar.gz
+	$_config
+	01_keyboard_fix.patch
+	02_fix_undeclared_AID_INET.patch
+	04_make_rdr_hisi_adapter_compileable.patch
+	05_fix_mali_vsync_undefined.patch
+	06_fix_fingerprint_pmic_undefined.patch
+	07_fix_cgroup_on_dfl_export.patch
+"
+builddir="$srcdir/android_kernel_huawei_venus-$_commit"
+_outdir="out"
+
+prepare() {
+	default_prepare
+	. downstreamkernel_prepare
+}
+
+build() {
+	unset LDFLAGS
+	make O="$_outdir" ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-postmarketOS"
+	# NOTE: do NOT build Image.gz-dtb here. This device's bootloader has
+	# no gzip-decompression path for the kernel image (confirmed from the
+	# real stock build.sh, which produces a bare uncompressed Image, and
+	# from the real Android device tree's BOARD_KERNEL_IMAGE_NAME := Image
+	# with no dtb/compression settings at all). A gzip-compressed
+	# Image.gz-dtb gets silently preferred by downstreamkernel_package's
+	# search order and then never successfully executes on real hardware.
+}
+
+package() {
+	downstreamkernel_package "$builddir" "$pkgdir" "$_carch" "$_flavor" "$_outdir"
+}
+
+sha512sums="
+2e67c8f84b297dfa03b3426be3ab3687f8478a2180b1745bf8a55d9e72071bedbf1af550f95ff4d1634b95a7e4560a857a0d4dfd6415029d408e1a95f81130b1  linux-huawei-venus-c93d7f0aedb5c5ea608a891a530979976d537998.tar.gz
+d72add8f0a5d4e08fe62a18b9978271c09d250d626eab573b88c5ad9daf22e7273d3d1c08c35207656e00e6809233b932b4932e4f5c65e4d939c6fd1ef3bdefa  config-huawei-venus.aarch64
+2300cd172cad77262804e16deba4f7e028bad638c3dea1d85074eec0289bac3f6e6922b4b31f42a24d075c4954a742b3444b69819765595037c163f56a371dbc  01_keyboard_fix.patch
+33599989d5088bb58bcbebe1b33f324fca130fac7f4938e848c07abafb119af9cebf94ef4acf786b5e43e9199a8200aa216a4238a0331d426861651204aea8c8  02_fix_undeclared_AID_INET.patch
+cdc60b6c829df3b014226b9cb506ed71cf005cf5fec8d4339b54a23f052465501aaa4983ec00f33ef301db2e6a70b24a30439b3f6ce8f7c00348c05d3132ec3f  04_make_rdr_hisi_adapter_compileable.patch
+f628fd74f0b79f2322fe67f273bae890a11af6fc241c0203ad2a2483d9e3bc5abac20e799e283f76939aa66db2cfe693e40d2a0402906ae566067e671b2c0ae0  05_fix_mali_vsync_undefined.patch
+f57bab3ee55154f1050356b651ef1fb33d7ced2514e479a7da6f8a7e4d65387d382c02a8bbfe62c335ed29c951a7f97b7af79cb19ecb26085f92a5ec8a495440  06_fix_fingerprint_pmic_undefined.patch
+e66e1c6a63a1bf98e6eac4d6fe739c2701eebe4ffb5def7f4909b5d66fabe4210ab8d38333b9e7681f05b74fa054c224cb05480e4a2d631c3db701dc45f899eb  07_fix_cgroup_on_dfl_export.patch
+"

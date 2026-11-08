@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P9 Lite Status</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e3e5ea;
+    --track: #e9ebef; --ok: #1f9d55; --warn: #d97706; --bad: #dc2626; --accent: #2b7bd6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d0f12; --panel: #161a1f; --ink: #e8eaed; --muted: #8b929c; --line: #262b33;
+            --track: #232831; --ok: #3ccb6f; --warn: #f0b429; --bad: #f05252; --accent: #4ea1f3; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 40px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .dot.stale { background: var(--bad); }
+  .grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .screen { order: -1; max-width: 260px; margin: 0 auto; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .stack { display: grid; gap: 16px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; row-gap: 6px; column-gap: 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .metric { margin-bottom: 12px; }
+  .metric:last-child { margin-bottom: 0; }
+  .metric .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .metric .val { font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .4s ease; }
+  .svc { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
+  .svc:first-of-type { border-top: 0; padding-top: 0; }
+  .svc a { color: var(--ink); text-decoration: none; }
+  .svc a:hover { color: var(--accent); }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; color: #fff; background: var(--ok); }
+  .pill.down { background: var(--bad); }
+  .screen img { width: 100%; display: block; border-radius: 10px; image-rendering: pixelated; background: #000; aspect-ratio: 9 / 16; }
+  .screen p { margin: 8px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+  .batt-state { font-weight: 600; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 8px; min-height: 1em; }
+  code { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 id="host">P9 Lite</h1>
+      <div class="sub">Huawei P9 Lite · postmarketOS · <span id="uptime">–</span> uptime</div>
+    </div>
+    <div class="sub live"><span class="dot" id="dot"></span><span id="updated">waiting for data…</span></div>
+  </header>
+
+  <div class="grid">
+    <div class="stack">
+      <section class="card">
+        <h2>Resources</h2>
+        <div id="metrics"></div>
+      </section>
+
+      <section class="card">
+        <h2>Power</h2>
+        <dl class="kv">
+          <dt>Battery</dt><dd><span id="bpct">–</span> · <span class="batt-state" id="bstate">–</span></dd>
+          <dt>Current</dt><dd id="bcur">–</dd>
+          <dt>Battery temp</dt><dd id="btemp">–</dd>
+          <dt>Charger</dt><dd id="bext">–</dd>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Network</h2>
+        <dl class="kv">
+          <dt>Wi-Fi</dt><dd id="ssid">–</dd>
+          <dt>Signal</dt><dd id="rssi">–</dd>
+          <dt>Wi-Fi IP</dt><dd id="ip">–</dd>
+          <dt>USB IP</dt><dd id="usb">–</dd>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Services</h2>
+        <div id="svcs"></div>
+        <div class="err" id="err"></div>
+      </section>
+    </div>
+
+    <aside class="screen card">
+      <h2>Phone screen</h2>
+      <img id="shot" src="screen.png" alt="Live copy of the phone's LCD dashboard">
+      <p>Same frame the LCD is showing, refreshed every 10 s</p>
+    </aside>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const pct = (u, t) => t ? Math.min(100, 100 * u / t) : 0;
+const level = p => p < 70 ? 'var(--ok)' : p < 90 ? 'var(--warn)' : 'var(--bad)';
+const links = { nginx: ':8080/', home_assist: ':8123/' };
+const labels = { nginx: 'nginx', home_assist: 'Home Assistant' };
+
+function metric(name, val, p, color) {
+  return `<div class="metric"><div class="row"><span>${name}</span><span class="val">${val}</span></div>
+          <div class="bar"><i style="width:${p.toFixed(1)}%;background:${color || level(p)}"></i></div></div>`;
+}
+
+function render(d) {
+  $('host').textContent = d.hostname;
+  $('uptime').textContent = d.uptime.toLowerCase();
+  const b = d.battery;
+  const battColor = b.state === 'ON BATTERY' ? (b.pct > 30 ? 'var(--warn)' : 'var(--bad)') : 'var(--ok)';
+  $('metrics').innerHTML =
+    metric('CPU', d.cpu_pct.toFixed(1) + '%', d.cpu_pct) +
+    metric('Memory', `${d.ram_mb.used} / ${d.ram_mb.total} MB`, pct(d.ram_mb.used, d.ram_mb.total)) +
+    metric('Swap (zram)', `${d.swap_mb.used} / ${d.swap_mb.total} MB`, pct(d.swap_mb.used, d.swap_mb.total)) +
+    metric('Disk', `${d.disk_gb.used.toFixed(1)} / ${d.disk_gb.total.toFixed(1)} GB`, pct(d.disk_gb.used, d.disk_gb.total)) +
+    metric('SoC temp', d.soc_temp_c.toFixed(0) + ' °C', pct(d.soc_temp_c, 90)) +
+    metric('Battery', (b.pct ?? '?') + '%', b.pct ?? 0, battColor);
+
+  $('bpct').textContent = (b.pct ?? '?') + '%';
+  $('bstate').textContent = b.state.charAt(0) + b.state.slice(1).toLowerCase();
+  $('bstate').style.color = battColor;
+  $('bcur').textContent = `${b.current_ma} mA ${b.state === 'CHARGING' ? 'in' : b.state === 'ON BATTERY' ? 'out' : ''}`.trim();
+  $('btemp').textContent = b.temp_c.toFixed(1) + ' °C';
+  $('bext').textContent = b.external_power ? 'Connected' : 'Not connected';
+
+  $('ssid').textContent = `${d.wifi.ssid} (${d.wifi.state.toLowerCase()})`;
+  $('rssi').textContent = d.wifi.rssi_dbm + ' dBm';
+  $('ip').textContent = d.wifi.ip;
+  $('usb').textContent = d.usb_ip;
+
+  $('svcs').innerHTML = Object.entries(d.services).map(([k, s]) =>
+    `<div class="svc"><a href="${location.protocol}//${location.hostname}${links[k] || ':' + s.port + '/'}">${labels[k] || k} <span class="sub">:${s.port}</span></a>
+     <span class="pill ${s.up ? '' : 'down'}">${s.up ? 'UP' : 'DOWN'}</span></div>`).join('');
+
+  const t = new Date(d.time.replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+  const age = (Date.now() - t) / 1000;
+  $('updated').textContent = 'updated ' + t.toLocaleTimeString();
+  $('dot').classList.toggle('stale', age > 60);
+}
+
+async function tick() {
+  try {
+    const r = await fetch('status.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    render(await r.json());
+    $('shot').src = 'screen.png?t=' + Date.now();
+    $('err').textContent = '';
+  } catch (e) {
+    $('err').textContent = 'Could not load status.json: ' + e.message;
+    $('dot').classList.add('stale');
+  }
+}
+tick();
+setInterval(tick, 10000);
+</script>
+</body>
+</html>

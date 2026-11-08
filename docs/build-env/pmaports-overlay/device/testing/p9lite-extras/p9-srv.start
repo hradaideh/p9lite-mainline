@@ -1,0 +1,5 @@
+#!/bin/sh
+# install nginx status page + config where the nginx container expects them
+mkdir -p /srv/p9-web /srv/p9-nginx
+cp /usr/share/p9lite/web/index.html /srv/p9-web/index.html
+cp /usr/share/p9lite/web/default.conf /srv/p9-nginx/default.conf

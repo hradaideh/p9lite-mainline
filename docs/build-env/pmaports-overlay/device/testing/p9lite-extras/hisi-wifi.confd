@@ -1,0 +1,7 @@
+# /etc/conf.d/hisi-wifi -- settings for /etc/init.d/hisi-wifi
+# IP_MODE: "static" or "dhcp"
+IP_MODE="static"
+IP_ADDR="192.168.2.50/24"
+IP_GW="192.168.2.1"
+IP_DNS="192.168.2.1 1.1.1.1"
+WPA_CONF="/etc/wpa_supplicant/wpa_supplicant.conf"

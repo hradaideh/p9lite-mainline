@@ -1,0 +1,66 @@
+diff --git a/main/postmarketos-initramfs/APKBUILD b/main/postmarketos-initramfs/APKBUILD
+index acd0127..4a03cad 100644
+--- a/main/postmarketos-initramfs/APKBUILD
++++ b/main/postmarketos-initramfs/APKBUILD
+@@ -2,7 +2,7 @@
+ maintainer="Casey Connolly <kcxt@postmarketos.org>"
+ pkgname=postmarketos-initramfs
+ pkgver=3.12.5
+-pkgrel=0
++pkgrel=2
+ pkgdesc="Base files for the postmarketOS initramfs / initramfs-extra"
+ url="https://postmarketos.org"
+ provides="postmarketos-ramdisk=$pkgver-r$pkgrel"
+@@ -118,7 +118,7 @@ ace852ba267b3408998970df6042603c8bec1d033066d1c30ed65f1be955fee8644b57882898f102
+ 69852928464f01757e2f473bd2c2e7ecb4132ecf3e26bdec95932e928dfe9042f59316e0a509fd38bcda88e24dd94bf33e8a88118b5adbec7023d1c13da12f59  00-initramfs-base.files
+ 669240c0c6b84ff68ea7696b3ffd39c209c7c6d52233f67a2515ac423e16c3daa7841d8451946b14dc95e1d18ff31cc35c4a22efb8a36caceb48aada5d4ee5ea  00-initramfs-extra-base.files
+ b74fb087792165ac32bb2b5c6cdd8456891260de44000e08c7c4d25fe13ad017041ca14094c33392d1140ba32a9eed6cbc7eb6697e297df3575c33554f3f3eb3  init.sh
+-84a575e2ac6cdf67b0f5f52f660f1297327b884d0cb80387a92c66d603a462067123abbf522c4c729fbc230d614faae19bec1677863146a22cb8083d4c9250a2  init_functions.sh
++1c41d3f67788fa2bc4d83f147b34fdef7f070d6974f3170cd3bc8f34e6a31d553b78b2527cec292a0fdd4cd5146d4acdb7b0214e04f267d92085c8a29cb7c70a  init_functions.sh
+ 7aa82d5e2907470d667612643d98371dff27b2650051f8c568ab43d1b97677362c3e6fbd442474086d681ea7c0cfbcaf269d3eef2d2dc3ff4ebf17c786b82148  init_2nd.sh
+ 0c817341047df07c2b74d5f992b09d449365e0f7ed3d06d67dd470fde2c7429de8900ccc12895d133873f0d1e226d9fd3aae8127df802e882e1ddc5baa240711  init_functions_2nd.sh
+ 675e7d5bee39b2df7d322117f8dcaccc274d61beaf4d50ead19bbf2109446d64b1c0aa0c5b4f9846eb6c1c403418f28f6364eff4537ba41120fbfcbc484b7da7  mdev.conf
+diff --git a/main/postmarketos-initramfs/init_functions.sh b/main/postmarketos-initramfs/init_functions.sh
+index 93fa7ad..12cfa89 100644
+--- a/main/postmarketos-initramfs/init_functions.sh
++++ b/main/postmarketos-initramfs/init_functions.sh
+@@ -371,7 +371,7 @@ mount_subpartitions() {
+ 		losetup_args="$losetup_args --sector-size $deviceinfo_rootfs_image_sector_size"
+ 	fi
+ 	attempt_start=$(get_uptime_seconds)
+-	wait_seconds=10
++	wait_seconds=45
+ 	echo "Trying to mount subpartitions for $wait_seconds seconds..."
+ 
+ 	# Subpartition init uses losetup, so make sure the loop module is loaded.
+@@ -666,7 +666,7 @@ wait_partition() {
+ 	fi
+ 
+ 	splash_set_message "Waiting for $description partition"
+-	for _ in $(seq 1 30); do
++	for _ in $(seq 1 60); do
+ 		sleep 1
+ 		$findfunc partition
+ 		if [ -n "$partition" ]; then
+@@ -837,6 +837,11 @@ setup_usb_network_configfs() {
+ 		return
+ 	fi
+ 
++	local _udc_wait=0
++	while [ -z "$(get_usb_udc)" ] && [ "$_udc_wait" -lt 50 ]; do
++		sleep 0.1
++		_udc_wait=$(( _udc_wait + 1 ))
++	done
+ 	if [ -z "$(get_usb_udc)" ]; then
+ 		info "No UDC found, skipping gadget setup..."
+ 		return
+@@ -1433,7 +1438,8 @@ export_logs() {
+ 
+ fail_halt_boot() {
+ 	beebzzr -b 3 -d 250 &
+-	export_logs
++	# export_logs skipped: it was hanging before reaching debug_shell,
++	# which meant no USB ACM/telnet console ever came up for debugging.
+ 	debug_shell
+ 	echo "Looping forever"
+ 	while true; do

@@ -1,0 +1,63 @@
+# Maintainer: Hamdan Radaideh <hamdan.radaideh2012@gmail.com>
+pkgname=p9lite-extras
+pkgdesc="P9 Lite homelab extras: LCD dashboard (p9-display), hisi wifi service, zram swap, status web page"
+pkgver=1.0
+pkgrel=0
+url="https://postmarketos.org"
+license="MIT"
+arch="noarch"
+options="!check"
+depends="python3 wpa_supplicant"
+source="
+	hisi-wifi.initd
+	hisi-wifi.confd
+	p9-display.initd
+	p9-display.confd
+	p9-display
+	p9-verify
+	zram-swap.start
+	90-zram.conf
+	90-hisi-wifi.conf
+	99-unmanage-wlan0.conf
+	p9-web-index.html
+	p9-srv.start
+	p9-nginx-default.conf
+	"
+builddir="$srcdir"
+
+build() { :; }
+
+package() {
+	install -Dm755 "$srcdir"/hisi-wifi.initd "$pkgdir"/etc/init.d/hisi-wifi
+	install -Dm644 "$srcdir"/hisi-wifi.confd "$pkgdir"/etc/conf.d/hisi-wifi
+	install -Dm755 "$srcdir"/p9-display.initd "$pkgdir"/etc/init.d/p9-display
+	install -Dm644 "$srcdir"/p9-display.confd "$pkgdir"/etc/conf.d/p9-display
+	install -Dm755 "$srcdir"/p9-display "$pkgdir"/usr/bin/p9-display
+	install -Dm755 "$srcdir"/p9-verify "$pkgdir"/usr/bin/p9-verify
+	install -Dm755 "$srcdir"/zram-swap.start "$pkgdir"/etc/local.d/zram-swap.start
+	install -Dm644 "$srcdir"/90-zram.conf "$pkgdir"/etc/sysctl.d/90-zram.conf
+	install -Dm644 "$srcdir"/90-hisi-wifi.conf "$pkgdir"/etc/NetworkManager/conf.d/90-hisi-wifi.conf
+	install -Dm644 "$srcdir"/99-unmanage-wlan0.conf "$pkgdir"/etc/NetworkManager/conf.d/99-unmanage-wlan0.conf
+	install -Dm644 "$srcdir"/p9-web-index.html "$pkgdir"/usr/share/p9lite/web/index.html
+	install -Dm644 "$srcdir"/p9-nginx-default.conf "$pkgdir"/usr/share/p9lite/web/default.conf
+	install -Dm755 "$srcdir"/p9-srv.start "$pkgdir"/etc/local.d/p9-srv.start
+	# enable services at boot
+	mkdir -p "$pkgdir"/etc/runlevels/default
+	ln -sf /etc/init.d/hisi-wifi "$pkgdir"/etc/runlevels/default/hisi-wifi
+	ln -sf /etc/init.d/p9-display "$pkgdir"/etc/runlevels/default/p9-display
+}
+sha512sums="
+2d906d567a2a30564e798c82463e341bc24100c048f76ef1d9e5db864fcb6a1dc40bbeaea96ea0e771605f6ace32e0c32129f02717173a5531af5c955af6234e  hisi-wifi.initd
+b173ed1d8fcd0bd6ee6bfdca8f369c0634297cf4be28b93615597e809c3fe7f21b70d37b9dcef848cf9ca127895e6755c406b73d6a4a4fac0ecca8f0ce3c45e8  hisi-wifi.confd
+6f7b09229d36b05282611f6ab96118eb5da5c791893a0bea5581cc67f2b651c4dfb72a3943cc09bab31504dec042878a2c65284087df3a3d41a8b496664434a4  p9-display.initd
+afca61dc0383513227ae2fb632eecc416e0fdd7dda25a71f4dfd7fa87cb7a6d211e85ac723163a2ec72201c20dc1ec6802ee71416da8a169fa83df8c871d926b  p9-display.confd
+9b0f6ae349b7b4b1d22f9d5c1ecb8ce2978b9a8a69346d1b6819581e72335281a053559235ebf6092f4af2b7f0aff15d85123d6da773216b2ca017ae30f1b6e6  p9-display
+82e313aa8155808eff2eaa8a43c1dae4ef496efb8f0e79e8a897559aa0d4a9a320b70d2dec9e20db3c833674458ff425b7bc4648618f552a1498b656fe902f38  p9-verify
+8d13df6addc93fe324bce0959571b4c4f5558a9196b7c684324aa742014957cf467d0204c7c6083e28ceda84a915338bb96e8d3bb3e09b43d955a8ec0bea5ca6  zram-swap.start
+abb8c0fdb17b9061a993c407cf95707d34adff2bdde63376e77f64b0280a6fc2b0006c005da787a63eed7f44e53a9411e7b79b5fbc629de43476316923003de7  90-zram.conf
+5470e278d43878de51af073a861aaca9ed962647313fdd5510fc7c40d54230d95f423ea5cd050668dc4bfa7699dbef4917340cbce77c9af66c4214878863e289  90-hisi-wifi.conf
+c55115bc305751c1a2cd1ffd1062be484838e14a5ad75209ad08bf6d130adc727b68f82018f7e0c5d7febd3e31c396ffa42f91592d1beb708674f6e4af925475  99-unmanage-wlan0.conf
+c6c5380f074a09c8aa18074604e73022051c817182cc3aa08cd5ae1e53bbe6d923d426277118bec07a14c83a22791183dca8c1982684e6c05fb0ace9e0d6b9d5  p9-web-index.html
+de44c718b034be040c0041076feeef15b5c990ebd291978ab0c83f8cd176b990c8c73b2c9b1b1d24f0581d398a8c4ac567c99cb7dd220fc170fd876853c29b96  p9-srv.start
+6a9df6964e13d111f4b527163e37fb98d06d09646b5c147d9fcec0f3c41d0ff06a50f43383fa3d2db5c6cecab1254b43028b3166f565d6780f7ca24de8cf5852  p9-nginx-default.conf
+"

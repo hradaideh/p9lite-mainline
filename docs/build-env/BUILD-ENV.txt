@@ -1,0 +1,26 @@
+[pmbootstrap]
+aports = /home/deck/p9lite-linux-deck/pmaports
+device = huawei-venus
+extra_packages = openssh,nginx,python3,git,vim,htop,curl
+hostname = p9lite
+is_default_channel = False
+service_manager = openrc
+ssh_keys = True
+timezone = Asia/Amman
+
+[providers]
+
+[mirrors]
+
+
+pmaports HEAD: e5accb25103ec804d6f30d4c820ef317bdfb55b3
+pmbootstrap HEAD: 46ee403e4680002ce42dc2645adf9b08557270e9
+total 31536
+drwxr-xr-x  2 deck deck     4096 Oct 31 16:16 .
+drwx------ 40 deck deck     4096 Nov  1 15:33 ..
+-rw-r--r--  1 deck deck 32282624 Oct 31 16:16 boot-known-good-pkgrel15.img
+0a039643bbe3d8776631bd86264ca066  /home/deck/p9lite-backups/boot-known-good-pkgrel15.img
+[http]
+	lowSpeedLimit = 1000
+	lowSpeedTime = 60
+	postBuffer = 524288000

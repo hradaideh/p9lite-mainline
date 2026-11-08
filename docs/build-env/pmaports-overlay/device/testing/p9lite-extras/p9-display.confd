@@ -1,0 +1,5 @@
+# /etc/conf.d/p9-display
+# Backlight 0-255 (panel min usable ~3). Lower = cooler/less power.
+P9_BRIGHTNESS=60
+# Seconds between screen refreshes
+P9_INTERVAL=10

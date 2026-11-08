@@ -1,0 +1,33 @@
+#!/bin/sh
+p() { if eval "$2" >/dev/null 2>&1; then echo "PASS  $1"; else echo "FAIL  $1"; fi; }
+echo "uptime: $(uptime)"
+echo "--- services"
+for s in hisi-wifi docker networkmanager sshd local cgroups; do p "service $s started" "rc-service $s status | grep -q started"; done
+echo "--- wifi"
+p "wlan0 associated to IOT" "sudo -n wpa_cli -i wlan0 status | grep -q '^ssid=IOT' && sudo -n wpa_cli -i wlan0 status | grep -q COMPLETED"
+p "static IP 192.168.2.50/24" "ip -4 addr show wlan0 | grep -q '192.168.2.50/24'"
+p "default route via 192.168.2.1" "ip route | grep -q 'default via 192.168.2.1 dev wlan0'"
+p "DNS resolves" "nslookup google.com"
+p "internet (1.1.1.1)" "ping -c 2 -W 3 1.1.1.1"
+p "no dhcp client running" "! pgrep udhcpc"
+p "driver iface list clean (2 ifaces)" "[ \$(iw dev | grep -c Interface) -eq 2 ]"
+echo "--- usb"
+p "rndis 172.16.42.1 up" "ip -4 addr show rndis0 | grep -q 172.16.42.1"
+echo "--- memory/swap"
+p "zram0 swap active" "grep -q ^/dev/zram0 /proc/swaps"
+p "zram lz4" "grep -q '\[lz4\]' /sys/block/zram0/comp_algorithm"
+p "swappiness=100" "[ \$(cat /proc/sys/vm/swappiness) = 100 ]"
+echo "--- docker"
+p "cgroup v1 (legacy)" "[ ! -e /sys/fs/cgroup/cgroup.controllers ]"
+p "default runtime runc-old" "sudo -n docker info 2>/dev/null | grep -q 'Default Runtime: runc-old'"
+p "nginx running" "[ \$(sudo -n docker inspect -f '{{.State.Running}}' nginx) = true ]"
+p "homeassistant running" "[ \$(sudo -n docker inspect -f '{{.State.Running}}' homeassistant) = true ]"
+p "nginx HTTP 200 :8080" "[ \$(curl -s -o /dev/null -w %{http_code} http://127.0.0.1:8080/) = 200 ]"
+p "HA HTTP 200 :8123" "[ \$(curl -s -o /dev/null -w %{http_code} http://127.0.0.1:8123/onboarding.html) = 200 ]"
+echo "--- access"
+p "passwordless sudo" "sudo -n true"
+echo "--- snapshot"
+free -m | sed -n 2,3p
+sudo -n docker stats --no-stream --format "{{.Name}} cpu={{.CPUPerc}} mem={{.MemUsage}}"
+df -h / | tail -1
+echo "soc_temp=$(cat /sys/class/thermal/thermal_zone0/temp)"

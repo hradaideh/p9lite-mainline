@@ -1,0 +1,11 @@
+--- a/drivers/huawei_platform/sensor/fingerprint/fingerprint.c
++++ b/drivers/huawei_platform/sensor/fingerprint/fingerprint.c
+@@ -856,7 +856,7 @@
+             return -EINVAL;
+         }
+ 
+-        hw_extern_pmic_config(fingerprint->extern_ldo_num,  fingerprint->extern_vol, 1);
++        /* hw_extern_pmic_config removed: camera/pmic subsystem disabled for headless build */
+ 
+         //hwlog_info("ldo_num = %d, ldo_vol = %d", fingerprint->extern_ldo_num, fingerprint->extern_vol );
+         return 0;

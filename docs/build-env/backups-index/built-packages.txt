@@ -1,0 +1,27 @@
+total 121420
+drwxr-xr-x 2 12345 12345     4096 Oct 31 15:40 .
+drwxr-xr-x 4 12345 12345     4096 Oct 30 14:26 ..
+-rw-r--r-- 1 12345 12345     2038 Oct 31 15:40 APKINDEX.tar.gz
+-rw-r--r-- 1 12345 12345     2307 Oct 30 12:56 device-huawei-venus-0.1-r0.apk
+-rw-r--r-- 1 12345 12345     2327 Oct 31 10:04 device-huawei-venus-0.1-r1.apk
+-rw-r--r-- 1 12345 12345     2322 Oct 31 14:52 device-huawei-venus-0.1-r2.apk
+-rw-r--r-- 1 12345 12345 11934387 Oct 30 12:52 linux-huawei-venus-4.1.18-r0.apk
+-rw-r--r-- 1 12345 12345 10158780 Oct 31 14:42 linux-huawei-venus-4.1.18-r10.apk
+-rw-r--r-- 1 12345 12345 10158789 Oct 31 14:47 linux-huawei-venus-4.1.18-r11.apk
+-rw-r--r-- 1 12345 12345 10161124 Oct 31 15:00 linux-huawei-venus-4.1.18-r12.apk
+-rw-r--r-- 1 12345 12345 10163459 Oct 31 15:04 linux-huawei-venus-4.1.18-r13.apk
+-rw-r--r-- 1 12345 12345 10164550 Oct 31 15:15 linux-huawei-venus-4.1.18-r14.apk
+-rw-r--r-- 1 12345 12345 10172526 Oct 31 15:40 linux-huawei-venus-4.1.18-r15.apk
+-rw-r--r-- 1 12345 12345 10538975 Oct 30 13:32 linux-huawei-venus-4.1.18-r4.apk
+-rw-r--r-- 1 12345 12345 10268986 Oct 30 13:42 linux-huawei-venus-4.1.18-r5.apk
+-rw-r--r-- 1 12345 12345 10056458 Oct 30 13:57 linux-huawei-venus-4.1.18-r6.apk
+-rw-r--r-- 1 12345 12345 10404781 Oct 30 16:34 linux-huawei-venus-4.1.18-r7.apk
+-rw-r--r-- 1 12345 12345 10056451 Oct 30 16:59 linux-huawei-venus-4.1.18-r8.apk
+-rw-r--r-- 1 12345 12345    20209 Oct 30 14:30 postmarketos-initramfs-3.12.5-r1.apk
+-rw-r--r-- 1 12345 12345    20258 Oct 30 16:18 postmarketos-initramfs-3.12.5-r2.apk
+
+(323387) [21:11:17] (rootfs_huawei-venus) % mkinitfs
+(323387) [21:11:17] (rootfs_huawei-venus) % mkinitfs
+(323387) [21:11:17] *** output passed to pmbootstrap stdout, not to this log ***
+(323387) [21:11:43] NOTE: chroot is still active (use 'pmbootstrap shutdown' as necessary)
+(323387) [21:11:43] DONE!

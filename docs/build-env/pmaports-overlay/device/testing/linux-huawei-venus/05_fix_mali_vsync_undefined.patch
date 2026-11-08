@@ -1,0 +1,20 @@
+--- a/drivers/video/fbdev/hisi/dss/hisi_fb_vsync.c
++++ b/drivers/video/fbdev/hisi/dss/hisi_fb_vsync.c
+@@ -20,7 +20,7 @@
+ */
+ #define VSYNC_CTRL_EXPIRE_COUNT	(4)
+ 
+-extern void mali_kbase_pm_report_vsync(int);
++/* mali_kbase_pm_report_vsync removed: MALI_MIDGARD disabled for headless build */
+ extern int mipi_dsi_ulps_cfg(struct hisi_fb_data_type *hisifd, int enable);
+ extern bool hisi_dss_check_reg_reload_status(struct hisi_fb_data_type *hisifd);
+ 
+@@ -353,7 +353,7 @@
+ 	mutex_init(&(vsync_ctrl->vsync_lock));
+ 
+ 	atomic_set(&(vsync_ctrl->buffer_updated), 1);
+-	vsync_ctrl->vsync_report_fnc = mali_kbase_pm_report_vsync;
++	vsync_ctrl->vsync_report_fnc = NULL;
+ 
+ 	if (hisifd->sysfs_attrs_append_fnc) {
+ 		hisifd->sysfs_attrs_append_fnc(hisifd, &dev_attr_vsync_event.attr);

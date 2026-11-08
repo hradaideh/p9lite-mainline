@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""p9-display: status dashboard on the Huawei P9 Lite LCD (hisifb, 1080x1920 BGRA).
+
+The hisifb driver powers the panel on when /dev/fb0 is opened and OFF when it is closed,
+so this daemon keeps the fd open for its whole life. Never call FBIOBLANK here: on top
+of the open-triggered power-on it crashed the phone (watchdog reset).
+"""
+import fcntl, mmap, os, signal, socket, struct, subprocess, sys, time, urllib.request
+
+W, H, STRIDE = 1080, 1920, 4320
+S = 6                       # physical pixels per logical pixel
+LW, LH = W // S, H // S     # 180 x 320 logical canvas
+BL = '/sys/class/leds/lcd_backlight0/brightness'
+BRIGHTNESS = int(os.environ.get('P9_BRIGHTNESS', '60'))
+INTERVAL = int(os.environ.get('P9_INTERVAL', '10'))
+WEB_DIR = os.environ.get('P9_WEB_DIR', '/srv/p9-web')   # served by the nginx container
+
+# palette index -> BGRA
+PAL = [bytes((0, 0, 0, 255)),        # 0 black
+       bytes((230, 230, 230, 255)),  # 1 white
+       bytes((120, 120, 120, 255)),  # 2 grey
+       bytes((80, 200, 60, 255)),    # 3 green
+       bytes((40, 40, 220, 255)),    # 4 red
+       bytes((0, 180, 240, 255)),    # 5 amber
+       bytes((230, 160, 40, 255)),   # 6 blue/cyan accent
+       bytes((40, 40, 40, 255))]     # 7 dark grey (bars)
+PXROW = [c * S for c in PAL]
+
+F = {  # 5x7 font, rows top->bottom
+ ' ': ['00000']*7,
+ '0': ['01110','10001','10011','10101','11001','10001','01110'],
+ '1': ['00100','01100','00100','00100','00100','00100','01110'],
+ '2': ['01110','10001','00001','00010','00100','01000','11111'],
+ '3': ['11110','00001','00001','01110','00001','00001','11110'],
+ '4': ['00010','00110','01010','10010','11111','00010','00010'],
+ '5': ['11111','10000','11110','00001','00001','10001','01110'],
+ '6': ['00110','01000','10000','11110','10001','10001','01110'],
+ '7': ['11111','00001','00010','00100','01000','01000','01000'],
+ '8': ['01110','10001','10001','01110','10001','10001','01110'],
+ '9': ['01110','10001','10001','01111','00001','00010','01100'],
+ 'A': ['01110','10001','10001','11111','10001','10001','10001'],
+ 'B': ['11110','10001','10001','11110','10001','10001','11110'],
+ 'C': ['01110','10001','10000','10000','10000','10001','01110'],
+ 'D': ['11100','10010','10001','10001','10001','10010','11100'],
+ 'E': ['11111','10000','10000','11110','10000','10000','11111'],
+ 'F': ['11111','10000','10000','11110','10000','10000','10000'],
+ 'G': ['01110','10001','10000','10111','10001','10001','01111'],
+ 'H': ['10001','10001','10001','11111','10001','10001','10001'],
+ 'I': ['01110','00100','00100','00100','00100','00100','01110'],
+ 'J': ['00111','00010','00010','00010','00010','10010','01100'],
+ 'K': ['10001','10010','10100','11000','10100','10010','10001'],
+ 'L': ['10000','10000','10000','10000','10000','10000','11111'],
+ 'M': ['10001','11011','10101','10101','10001','10001','10001'],
+ 'N': ['10001','10001','11001','10101','10011','10001','10001'],
+ 'O': ['01110','10001','10001','10001','10001','10001','01110'],
+ 'P': ['11110','10001','10001','11110','10000','10000','10000'],
+ 'Q': ['01110','10001','10001','10001','10101','10010','01101'],
+ 'R': ['11110','10001','10001','11110','10100','10010','10001'],
+ 'S': ['01111','10000','10000','01110','00001','00001','11110'],
+ 'T': ['11111','00100','00100','00100','00100','00100','00100'],
+ 'U': ['10001','10001','10001','10001','10001','10001','01110'],
+ 'V': ['10001','10001','10001','10001','10001','01010','00100'],
+ 'W': ['10001','10001','10001','10101','10101','10101','01010'],
+ 'X': ['10001','10001','01010','00100','01010','10001','10001'],
+ 'Y': ['10001','10001','01010','00100','00100','00100','00100'],
+ 'Z': ['11111','00001','00010','00100','01000','10000','11111'],
+ '.': ['00000','00000','00000','00000','00000','01100','01100'],
+ ':': ['00000','01100','01100','00000','01100','01100','00000'],
+ '/': ['00001','00010','00010','00100','01000','01000','10000'],
+ '%': ['11000','11001','00010','00100','01000','10011','00011'],
+ '-': ['00000','00000','00000','11111','00000','00000','00000'],
+ '+': ['00000','00100','00100','11111','00100','00100','00000'],
+ '(': ['00010','00100','01000','01000','01000','00100','00010'],
+ ')': ['01000','00100','00010','00010','00010','00100','01000'],
+ ',': ['00000','00000','00000','00000','01100','00100','01000'],
+ "'": ['00100','00100','01000','00000','00000','00000','00000'],
+ '*': ['00000','00100','10101','01110','10101','00100','00000'],
+ '?': ['01110','10001','00001','00010','00100','00000','00100'],
+ '#': ['01010','01010','11111','01010','11111','01010','01010'],
+}
+
+class Canvas:
+    def __init__(self): self.c = bytearray(LW * LH)
+    def clear(self): self.c[:] = bytes(LW * LH)
+    def rect(self, x, y, w, h, col):
+        for yy in range(max(0, y), min(LH, y + h)):
+            o = yy * LW
+            x0, x1 = max(0, x), min(LW, x + w)
+            if x1 > x0: self.c[o + x0:o + x1] = bytes((col,)) * (x1 - x0)
+    def text(self, x, y, s, col=1, scale=1):
+        for ch in s.upper():
+            g = F.get(ch, F['*'])
+            for ry, row in enumerate(g):
+                for rx, bit in enumerate(row):
+                    if bit == '1': self.rect(x + rx * scale, y + ry * scale, scale, scale, col)
+            x += 6 * scale
+        return x
+    def bar(self, x, y, w, h, frac, col):
+        frac = max(0.0, min(1.0, frac))
+        self.rect(x, y, w, h, 7)
+        self.rect(x, y, int(w * frac), h, col)
+    def frame(self):
+        out = []
+        for ly in range(LH):
+            o = ly * LW
+            row = b''.join(PXROW[i] for i in self.c[o:o + LW])
+            out.append(row * S)
+        return b''.join(out)
+
+def rd(p, d=''):
+    try:
+        with open(p) as f: return f.read().strip()
+    except OSError: return d
+
+_cpu = None
+def cpu_pct():
+    global _cpu
+    v = [int(x) for x in rd('/proc/stat').split('\n')[0].split()[1:8]]
+    busy, total = v[0] + v[1] + v[2] + v[5] + v[6], sum(v)
+    pct = 0.0
+    if _cpu and total > _cpu[1]: pct = 100.0 * (busy - _cpu[0]) / (total - _cpu[1])
+    _cpu = (busy, total)
+    return pct
+
+def meminfo():
+    m = {}
+    for l in rd('/proc/meminfo').split('\n'):
+        k, v = l.split(':'); m[k] = int(v.split()[0]) // 1024
+    return m
+
+def http_ok(url):
+    try: return urllib.request.urlopen(url, timeout=3).status == 200
+    except Exception: return False
+
+def ip_of(ifn):
+    try:
+        out = subprocess.run(['ip', '-4', '-o', 'addr', 'show', ifn], capture_output=True, text=True, timeout=3).stdout
+        return out.split()[3].split('/')[0]
+    except Exception: return '-'
+
+def wifi():
+    try:
+        st = subprocess.run(['wpa_cli', '-i', 'wlan0', 'status'], capture_output=True, text=True, timeout=3).stdout
+        sp = subprocess.run(['wpa_cli', '-i', 'wlan0', 'signal_poll'], capture_output=True, text=True, timeout=3).stdout
+        d = dict(l.split('=', 1) for l in (st + sp).split('\n') if '=' in l)
+        return d.get('ssid', '-'), d.get('RSSI', '?'), d.get('wpa_state', '?')
+    except Exception: return '-', '?', '?'
+
+def disk():
+    s = os.statvfs('/')
+    tot = s.f_blocks * s.f_frsize / 2**30; free = s.f_bavail * s.f_frsize / 2**30
+    return tot - free, tot
+
+def uptime():
+    u = int(float(rd('/proc/uptime', '0').split()[0]))
+    d, r = divmod(u, 86400); h, r = divmod(r, 3600); m = r // 60
+    return (f'{d}D ' if d else '') + f'{h}H {m:02d}M'
+
+def render(cv, tick):
+    cv.clear()
+    dx = tick % 3   # tiny pixel-shift each refresh (anti burn-in)
+    y = 6
+    cv.text(4 + dx, y, socket.gethostname()[:14], 6, 2); y += 20
+    cv.text(4 + dx, y, time.strftime('%H:%M'), 1, 4); y += 32
+    cv.text(4 + dx, y, time.strftime('%a %d %b %Y'), 2); y += 12
+    cv.text(4 + dx, y, 'UP ' + uptime(), 2); y += 14
+
+    cv.rect(4, y, LW - 8, 1, 7); y += 6
+    ssid, rssi, st = wifi()
+    cv.text(4 + dx, y, 'WIFI', 2); cv.text(40 + dx, y, f'{ssid} {rssi}DBM', 3 if st == 'COMPLETED' else 4); y += 11
+    cv.text(4 + dx, y, 'IP', 2); cv.text(40 + dx, y, ip_of('wlan0'), 1); y += 11
+    cv.text(4 + dx, y, 'USB', 2); cv.text(40 + dx, y, ip_of('rndis0'), 1); y += 14
+
+    cv.rect(4, y, LW - 8, 1, 7); y += 6
+    c = cpu_pct(); m = meminfo()
+    used = m['MemTotal'] - m['MemAvailable']; sw = m['SwapTotal'] - m['SwapFree']
+    du, dt = disk()
+    t = int(rd('/sys/class/thermal/thermal_zone0/temp', '0')) / 1000
+    bat = rd('/sys/class/power_supply/Battery/capacity', '?')
+    bst = rd('/sys/class/power_supply/Battery/status', '?').upper()
+    ext = rd('/sys/class/power_supply/USB/online', '0') == '1' or rd('/sys/class/power_supply/Mains/online', '0') == '1'
+    try: cur = abs(int(rd('/sys/class/power_supply/Battery/current_now', '0')))
+    except ValueError: cur = 0
+    if bst == 'CHARGING': blabel, bcol = 'CHARGING', 3
+    elif bst == 'FULL' or (ext and bst != 'DISCHARGING'): blabel, bcol = 'FULL PLUGGED', 3
+    else: blabel, bcol = 'ON BATTERY', None
+    bval = f'{bat}% {blabel} {cur}MA' if len(f'{bat}% {blabel} {cur}MA') <= 23 else f'{bat}% {blabel}'
+    info = {'hostname': socket.gethostname(), 'time': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+            'uptime': uptime(), 'uptime_s': int(float(rd('/proc/uptime', '0').split()[0])),
+            'wifi': {'ssid': ssid, 'rssi_dbm': rssi, 'state': st, 'ip': ip_of('wlan0')},
+            'usb_ip': ip_of('rndis0'),
+            'cpu_pct': round(c, 1),
+            'ram_mb': {'used': used, 'total': m['MemTotal']},
+            'swap_mb': {'used': sw, 'total': m['SwapTotal']},
+            'disk_gb': {'used': round(du, 2), 'total': round(dt, 2)},
+            'soc_temp_c': round(t, 1),
+            'battery': {'pct': int(bat) if bat.isdigit() else None, 'status': bst,
+                        'state': blabel, 'external_power': ext, 'current_ma': cur,
+                        'temp_c': int(rd('/sys/class/power_supply/Battery/temp', '0') or 0) / 10},
+            'services': {}}
+    rows = [('CPU', f'{c:4.1f}%', c / 100),
+            ('RAM', f'{used}/{m["MemTotal"]}M', used / m['MemTotal']),
+            ('SWAP', f'{sw}/{m["SwapTotal"]}M', sw / max(1, m['SwapTotal'])),
+            ('DISK', f'{du:.1f}/{dt:.1f}G', du / dt),
+            ('SOC', f'{t:.0f}C', t / 90),
+            ('BATT', bval, int(bat) / 100 if bat.isdigit() else 0)]
+    for name, val, frac in rows:
+        col = 3 if frac < 0.7 else (5 if frac < 0.9 else 4)
+        if name == 'BATT': col = bcol or (5 if frac > 0.3 else 4)
+        cv.text(4 + dx, y, name, 2); cv.text(40 + dx, y, val, 1); y += 9
+        cv.bar(4, y, LW - 8, 3, frac, col); y += 8
+
+    y += 2; cv.rect(4, y, LW - 8, 1, 7); y += 6
+    cv.text(4 + dx, y, 'SERVICES', 6); y += 11
+    for name, url in (('NGINX :8080', 'http://127.0.0.1:8080/'),
+                      ('HOME ASSIST :8123', 'http://127.0.0.1:8123/manifest.json')):
+        ok = http_ok(url)
+        info['services'][name.split(' :')[0].lower().replace(' ', '_')] = {'up': ok, 'port': int(name.rsplit(':', 1)[1])}
+        cv.rect(4 + dx, y, 6, 7, 3 if ok else 4)
+        cv.text(14 + dx, y, name, 1); cv.text(LW - 22 + dx, y, 'UP' if ok else 'DN', 3 if ok else 4); y += 11
+    cv.text(4 + dx, LH - 10, 'UPDATED ' + time.strftime('%H:%M:%S'), 2)
+    return info
+
+def png(cv):
+    """Logical canvas -> indexed 8-bit PNG (stdlib only)."""
+    import zlib
+    def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+    raw = b''.join(b'\x00' + bytes(cv.c[y * LW:(y + 1) * LW]) for y in range(LH))
+    plte = b''.join(bytes((p[2], p[1], p[0])) for p in PAL)
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', LW, LH, 8, 3, 0, 0, 0))
+            + chunk(b'PLTE', plte) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
+
+def publish(info, cv):
+    """Write status.json + screen.png for nginx (atomic rename)."""
+    import json
+    if not WEB_DIR or not os.path.isdir(WEB_DIR): return
+    for name, data in (('status.json', json.dumps(info, indent=1).encode()), ('screen.png', png(cv))):
+        tmp = os.path.join(WEB_DIR, '.' + name + '.tmp')
+        with open(tmp, 'wb') as f: f.write(data)
+        os.chmod(tmp, 0o644); os.replace(tmp, os.path.join(WEB_DIR, name))
+
+def main():
+    fd = os.open('/dev/fb0', os.O_RDWR)        # powers the panel on (hisifb)
+    mm = mmap.mmap(fd, STRIDE * H, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
+    vinfo = bytearray(160); fcntl.ioctl(fd, 0x4600, vinfo)   # FBIOGET_VSCREENINFO
+    struct.pack_into('II', vinfo, 16, 0, 0)                   # xoffset, yoffset = 0
+    def show(buf):
+        mm.seek(0); mm.write(buf)
+        fcntl.ioctl(fd, 0x4606, vinfo)                         # FBIOPAN_DISPLAY -> push frame
+    def bl(v):
+        try: open(BL, 'w').write(str(v))
+        except OSError: pass
+    def stop(*_):
+        show(bytes(STRIDE * H)); bl(0); mm.close(); os.close(fd); sys.exit(0)
+    signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
+    cv = Canvas(); cpu_pct(); tick = 0
+    while True:
+        info = render(cv, tick)
+        show(cv.frame())
+        try: publish(info, cv)
+        except Exception as e: print('publish failed:', e, flush=True)
+        if tick == 0: bl(BRIGHTNESS)
+        tick += 1
+        time.sleep(INTERVAL)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--png-test':
+        cv = Canvas(); cpu_pct(); time.sleep(0.2); render(cv, 0)
+        # dump logical canvas as PGM-like PPM for offline preview
+        rgb = [(p[2], p[1], p[0]) for p in PAL]
+        with open(sys.argv[2], 'wb') as f:
+            f.write(b'P6 %d %d 255\n' % (LW, LH))
+            f.write(b''.join(bytes(rgb[i]) for i in cv.c))
+        sys.exit(0)
+    main()

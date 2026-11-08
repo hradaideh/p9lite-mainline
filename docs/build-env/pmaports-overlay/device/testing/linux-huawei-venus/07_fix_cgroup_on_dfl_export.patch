@@ -1,0 +1,30 @@
+diff --git a/include/linux/cgroup.h b/include/linux/cgroup.h
+--- a/include/linux/cgroup.h
++++ b/include/linux/cgroup.h
+@@ -21,6 +21,14 @@
+ #include <linux/cgroup-defs.h>
+ 
+ #ifdef CONFIG_CGROUPS
++
++/*
++ * cgroup_on_dfl() is defined (non-static) in kernel/cgroup.c so that
++ * CONFIG_CGROUP_WRITEBACK code in fs/fs-writeback.c and CONFIG_MEMCG
++ * code in mm/memcontrol.c and mm/vmscan.c can call it. Without this
++ * declaration those translation units fail to link.
++ */
++extern bool cgroup_on_dfl(const struct cgroup *cgrp);
+ 
+ /*
+  * All weight knobs on the default hierarhcy should use the following min,
+diff --git a/kernel/cgroup.c b/kernel/cgroup.c
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -296,7 +296,7 @@
+  *
+  * - debug: disallowed on the default hierarchy.
+  */
+-static bool cgroup_on_dfl(const struct cgroup *cgrp)
++bool cgroup_on_dfl(const struct cgroup *cgrp)
+ {
+ 	return cgrp->root == &cgrp_dfl_root;
+ }

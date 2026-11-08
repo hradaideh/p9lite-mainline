@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+description="Status dashboard on the phone LCD (keeps /dev/fb0 open; hisifb powers panel off on close)"
+command=/usr/bin/python3
+command_args="/usr/bin/p9-display"
+command_background=true
+pidfile=/run/p9-display.pid
+output_log=/var/log/p9-display.log
+error_log=/var/log/p9-display.log
+retry="TERM/5/KILL/3"
+
+depend() {
+	after hisi-wifi docker
+}
+
+start_pre() {
+	export P9_BRIGHTNESS P9_INTERVAL
+}
