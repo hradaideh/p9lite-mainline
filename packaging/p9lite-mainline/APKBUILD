@@ -13,7 +13,7 @@ install="$pkgname.post-install $pkgname.post-upgrade"
 # ships /etc/init.d/hisi-wifi and p9-display on purpose (one small device package, no -openrc split)
 source="deviceinfo p9-boot-ok.start hisi-wifi 60_homeassistant.nft 70_mesh.nft
 	72_usb_tether.nft udhcpd-usb0.conf p9-usb-tether.initd p9-sd.initd 74_forgejo.nft
-	display/p9-display display/p9-hkadc display/p9-display.initd display/p9-display.confd display/index.html"
+	display/p9-display display/p9-hkadc display/p9-display.initd display/p9-display-off display/p9-display-off.initd display/p9-display.confd display/index.html"
 
 package() {
 	install -Dm644 "$srcdir"/deviceinfo "$pkgdir"/etc/deviceinfo
@@ -48,6 +48,8 @@ c0180c7b6dfb279f0e03270adb992a447c04bd0f0ac9d460a244dc01424fca7eda9b142b33be9bcc
 89fafa9cfd0997365815e5d894181675ffc23e62f1cce1cd4a65415ed6da8725d7e923f9a48d7b9f678bdfc229cda94326f4f4dff1323584062beda29b10a098  p9-display
 ecadc71cf35d5ede52baf96f2d7a1957103e96599ec07bbe6b8c70d97cc5d785a7ac26a3d10181cbd6a6098df0b0f0f41878f152ffa1b3ab835868f13dfa0eff  p9-hkadc
 c8e666fbde38bd8408d761924200d03759bb4e8372f07a583b70526adcca0ac3d6b4cdc840e0805ff65bdfafc61e2f86228ce12b67f15742e18f7b593fa1ff0f  p9-display.initd
+29a45e9fa7c4e114b82da1ff3c93d431582ba1c17f15879a5d3bc0f5f0ed3d5615eea3c6c548be21958612487e81fce426df8b2fc9a8c96f7474e15b897e8452  p9-display-off
+bd2285d99d6f13bbff9f4b3d1f71b9783d9fa46167ec6612fc8256fcd09b3f609ee837d300f916079a5a3a7cfe89f6c2c9f37536499addf1c30b38a1b8b11536  p9-display-off.initd
 7c40ce30b37e29496f1068e942be464d4b37ee953011acd789a46e2fe110249f1466ed1083d68ec9f09028d9e5ea0ef72920b56365e36419a5fa2a1fcb4cfc6e  p9-display.confd
 fa802855418346ff9a35ca43a65c38334ba6a2c353794afcd50b09dca57942183b39f242edb96e8fe2f6e00b80a6b49a15fdbb8fb6608bf5cc70689d931fb64a  index.html
 "
