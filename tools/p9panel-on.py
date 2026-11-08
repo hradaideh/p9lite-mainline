@@ -67,6 +67,20 @@ backlight control on, but nothing is displayed. Findings:
     power-cycles and re-inits DSS+DSI+panel in C with exact timing on every fb open), which register
     dumps cannot capture. Decision point: port the vendor hisifb power-on path (dpe_on -> mipi_dsi_on ->
     panel on -> single_frame_update) into the kernel, as was done for the Hi1102 Wi-Fi driver.
+  - 2026-11-08 record/replay (k44/p9iotrace.c hooks __raw_write{b,w,l} on vendor 4.4; traces in k7/logs):
+    the working hisifb power-off/on cycle does, beyond plain register writes:
+      * LPM3 power domains over IPC mailbox 14 (tools/p9lpm3.py works from mainline):
+        on {0xc0001,0x0a} vivobus, {0xc0001,0x0b} dsssubsys, {0xc0001,0x09} mmbuf; off = 0xc0101
+      * DSI block hardware reset: CRG PERRSTEN3/PERRSTDIS3 (0x84/0x88) bit 28
+      * panel rails: hi6522 (i2c-0 0x6b) reg 0x11 06->04->00 off, 04->06->07 on (5.3 s off delay)
+      * panel reset GPIO020 H/L/H twice, GPIO writes wrapped in PCTRL 0x400/0x404 (hw lock)
+    tools/p9disp-replay.py replays all of that with the recorded timing. Result: the first long
+    packet (panel cmd 2, generic long 0x29 len 4) still stalls - on mainline AND on vendor 4.4 itself
+    (display powered off by hisifb, powered on by the replay). So the replay misses something the
+    vendor driver does that a write trace cannot show (reads/polls that gate the next step, or
+    conditional logic). Static state and all recorded writes are equal; this is now a sequencing
+    problem inside mipi_dsi_on/panel_on, best solved by porting that C path, not by replay.
+  - Do NOT read the D-PHY test interface on 4.4 with p9dphy-read.py --live: it crashed the SoC twice.
 Next step needs lane-level visibility (logic analyser) or D-PHY escape-mode documentation, or
 running the vendor 4.4 takeover and dumping every DSS/DSI register for a diff against 7.x.
 """
