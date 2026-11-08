@@ -76,16 +76,19 @@ if not ON_ONLY:
  # 4.4 dpe_off tail (trace 5.306 s): inner clocks off, LPM3 powers the display subsystem off, bus clocks off.
  # No DSS register access from here until LPM3 has powered it back on.
  CRG = 0xFFF35000
- w(CRG + 0x34, 1 << 29); w(CRG + 0x34, 1 << 28); w(CRG + 0x54, 1 << 28)   # D-PHY ref/cfg, pclk_dsi0 off
- w(CRG + 0x34, 1 << 15); w(CRG + 0xf0, 0x00400000)                       # clk_ldi0 off
- w(CRG + 0x34, 1 << 17); w(CRG + 0xf0, 0x01000000)                       # clk_edc0 off
- if not p9lpm3.send(0xc0101, 0x0b):
-     raise SystemExit("LPM3 refused dsssubsys off - stopping before touching anything else")
- for dom in (0x09, 0x0a):                      # mmbuf, vivobus (reverse of the power-on order)
-     p9lpm3.send(0xc0101, dom)
- w(CRG + 0x34, 1 << 12); w(CRG + 0x34, 1 << 13); w(0xFFF0A174, 1 << 24) # pclk/aclk_dss, MMBUF off
- print("display subsystem powered off (LPM3)")
- time.sleep(0.5)                               # let the panel discharge
+ if "--no-lpm3" in sys.argv:                # keep the display domain powered: a power cycle makes MCTL/RCH secure-only
+  time.sleep(0.5)
+ else:
+  w(CRG + 0x34, 1 << 29); w(CRG + 0x34, 1 << 28); w(CRG + 0x54, 1 << 28)   # D-PHY ref/cfg, pclk_dsi0 off
+  w(CRG + 0x34, 1 << 15); w(CRG + 0xf0, 0x00400000)                       # clk_ldi0 off
+  w(CRG + 0x34, 1 << 17); w(CRG + 0xf0, 0x01000000)                       # clk_edc0 off
+  if not p9lpm3.send(0xc0101, 0x0b):
+      raise SystemExit("LPM3 refused dsssubsys off - stopping before touching anything else")
+  for dom in (0x09, 0x0a):                      # mmbuf, vivobus (reverse of the power-on order)
+      p9lpm3.send(0xc0101, dom)
+  w(CRG + 0x34, 1 << 12); w(CRG + 0x34, 1 << 13); w(0xFFF0A174, 1 << 24) # pclk/aclk_dss, MMBUF off
+  print("display subsystem powered off (LPM3)")
+  time.sleep(0.5)                               # let the panel discharge
 print("DSI reset asserted, RSTSTAT3=%08x; replaying %d writes" % (r(0xFFF3508C), len(seq)))
 prev = seq[0][0]
 ncmd, pld = 0, []
@@ -96,6 +99,8 @@ for t, a, s, v in seq:
     prev = t
     if a == RAIL:
         rail(v); continue
+    if a == LPM3_ON and "--no-lpm3" in sys.argv:
+        continue
     if a == LPM3_ON:                          # 4.4 sends three, in this order (all-writes trace, mbx14)
         for dom, name in ((0x0a, "vivobus"), (0x0b, "dsssubsys"), (0x09, "mmbuf")):
             if not p9lpm3.send(0xc0001, dom):
